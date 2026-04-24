@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  name         String?
+  passwordHash String?
+  role         Role        @default(USER)
+  createdAt    DateTime    @default(now())
+  savedAreas   SavedArea[]
+  reports      Report[]
+}
+
+model StormEvent {
+  id              String   @id @default(cuid())
+  externalId      String?  @unique
+  source          String
+  sourceUrl       String?
+  eventType       String
+  severity        String   @default("MODERATE")
+  confidenceLevel String   @default("ALERT_BASED")
+  locationName    String
+  state           String   @default("FL")
+  county          String?
+  zipCode         String?
+  latitude        Float?
+  longitude       Float?
+  startTime       DateTime
+  endTime         DateTime?
+  windSpeedMph    Float?
+  hailSizeInches  Float?
+  rainfallInches  Float?
+  tornadoEF       String?
+  description     String?
+  rawData         Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([startTime])
+  @@index([eventType])
+  @@index([state])
+  @@index([latitude, longitude])
+}
+
+model Alert {
+  id          String   @id @default(cuid())
+  nwsId       String   @unique
+  title       String
+  description String
+  eventType   String
+  areaDesc    String
+  severity    String
+  urgency     String
+  certainty   String
+  effective   DateTime
+  expires     DateTime
+  sourceUrl   String
+  rawGeometry Json?
+  createdAt   DateTime @default(now())
+
+  @@index([expires])
+  @@index([eventType])
+}
+
+model SavedArea {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  notes         String?
+  isProspecting Boolean  @default(false)
+  geoJson       Json
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Report {
+  id            String   @id @default(cuid())
+  userId        String
+  areaName      String
+  geoJson       Json?
+  stormEventIds String[]
+  alertIds      String[]
+  summary       String?
+  generatedAt   DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Location {
+  id          String  @id @default(cuid())
+  name        String
+  displayName String
+  type        String
+  state       String  @default("FL")
+  county      String?
+  zipCode     String?
+  latitude    Float
+  longitude   Float
+  boundingBox Json?
+
+  @@index([state, type])
+  @@index([name])
+  @@index([zipCode])
+}
