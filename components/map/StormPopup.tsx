@@ -1,7 +1,7 @@
 "use client"
 
 import { Popup } from "react-leaflet"
-import { ExternalLink, Bookmark, FileText, Copy, Wind, Droplets, Tornado } from "lucide-react"
+import { ExternalLink, FileText, Copy, Wind, Droplets, Tornado } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getStormColor } from "@/lib/stormColors"
@@ -10,6 +10,7 @@ import type { StormEvent } from "@/types"
 
 interface Props {
   event: StormEvent & { latitude: number; longitude: number }
+  nearbyCount?: number
 }
 
 const CONFIDENCE_COLORS: Record<string, string> = {
@@ -42,8 +43,22 @@ function buildSummary(event: StormEvent): string {
   return lines.filter(Boolean).join("\n")
 }
 
-export function StormPopup({ event }: Props) {
+export function StormPopup({ event, nearbyCount }: Props) {
   const color = getStormColor(event.eventType)
+
+  const createReport = () => {
+    fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        areaName: `${color.label} — ${event.locationName}`,
+        geoJson: { type: "Point", coordinates: [event.longitude, event.latitude] },
+        stormEventIds: [event.id],
+        alertIds: [],
+        summary: buildSummary(event),
+      }),
+    }).catch(() => {})
+  }
 
   return (
     <Popup maxWidth={320} className="storm-popup">
@@ -64,9 +79,19 @@ export function StormPopup({ event }: Props) {
 
         {/* Location + Date */}
         <div className="text-sm text-gray-700 mb-3 space-y-1">
-          <div className="font-semibold">{event.locationName}{event.county ? `, ${event.county} Co.` : ""}</div>
+          <div className="font-semibold">
+            {event.locationName}{event.county ? `, ${event.county} Co.` : ""}
+          </div>
           <div className="text-gray-500">{formatDate(event.startTime, "long")}</div>
         </div>
+
+        {/* Nearby count badge */}
+        {nearbyCount && nearbyCount > 1 && event.county && (
+          <div className="text-xs rounded-lg px-3 py-2 mb-3 font-medium"
+            style={{ backgroundColor: color.fill + "18", color: color.stroke }}>
+            {nearbyCount} {color.label} events in {event.county} County this period
+          </div>
+        )}
 
         {/* Metrics */}
         <div className="grid grid-cols-2 gap-2 mb-3">
@@ -78,7 +103,7 @@ export function StormPopup({ event }: Props) {
           )}
           {event.hailSizeInches && (
             <div className="flex items-center gap-1.5 text-xs bg-orange-50 rounded p-2">
-              <span className="h-3.5 w-3.5 text-center text-orange-600 font-bold text-xs">⬡</span>
+              <span className="text-orange-600 font-bold text-xs">⬡</span>
               <span>{event.hailSizeInches}&quot; hail</span>
             </div>
           )}
@@ -138,7 +163,7 @@ export function StormPopup({ event }: Props) {
         </p>
 
         {/* Actions */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex gap-1.5">
           <Button
             size="sm"
             variant="outline"
@@ -151,27 +176,10 @@ export function StormPopup({ event }: Props) {
           <Button
             size="sm"
             className="text-xs h-8 flex-1"
-            onClick={() => {
-              const geoJson = {
-                type: "Point",
-                coordinates: [event.longitude!, event.latitude!],
-              }
-              const body = {
-                name: `${color.label} — ${event.locationName}`,
-                geoJson,
-                stormEventIds: [event.id],
-                alertIds: [],
-                summary: buildSummary(event),
-              }
-              fetch("/api/reports", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-              })
-            }}
+            onClick={createReport}
           >
             <FileText className="h-3 w-3 mr-1" />
-            Report
+            Save Report
           </Button>
         </div>
       </div>

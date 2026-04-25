@@ -2,14 +2,15 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Map, Bookmark, FileText, Settings, LogOut, Zap } from "lucide-react"
+import { Map, Bookmark, FileText, Settings, LogOut, Zap, Newspaper } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { href: "/", icon: Map, label: "Storm Map" },
+  { href: "/news", icon: Newspaper, label: "Latest Reports" },
   { href: "/saved-areas", icon: Bookmark, label: "Saved Areas" },
-  { href: "/reports", icon: FileText, label: "Reports" },
+  { href: "/reports", icon: FileText, label: "My Reports" },
 ]
 
 export function Sidebar() {
@@ -46,7 +47,12 @@ export function Sidebar() {
       <div className="p-3 border-t border-slate-700 space-y-1">
         <Link
           href="/admin"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+            pathname === "/admin"
+              ? "bg-blue-700 text-white"
+              : "text-slate-300 hover:bg-slate-800 hover:text-white"
+          )}
         >
           <Settings className="h-5 w-5" />
           Admin
