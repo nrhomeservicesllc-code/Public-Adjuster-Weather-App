@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { Search, MapPin, X } from "lucide-react"
 import { useSearch } from "@/hooks/useSearch"
 import { useMapStore } from "@/store/mapStore"
@@ -8,11 +9,11 @@ import { useMapStore } from "@/store/mapStore"
 export function LocationSearch() {
   const { query, setQuery, results, loading } = useSearch()
   const [open, setOpen] = useState(false)
-  const { flyTo } = useMapStore()
+  const router = useRouter()
+  const pathname = usePathname()
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Open dropdown whenever user has typed enough
   useEffect(() => {
     setOpen(query.length >= 2)
   }, [query])
@@ -28,18 +29,26 @@ export function LocationSearch() {
   }, [])
 
   const handleSelect = (result: (typeof results)[number]) => {
-    const map = useMapStore.getState().mapRef as {
-      flyToBounds?: (b: [[number,number],[number,number]], o: object) => void
-      flyTo?: (latlng: [number, number], zoom: number) => void
-    } | null
-
-    if (result.boundingBox && map?.flyToBounds) {
-      map.flyToBounds(result.boundingBox as [[number,number],[number,number]], { padding: [40, 40] })
-    } else {
-      flyTo(result.latitude, result.longitude, 13)
-    }
     setQuery(result.name)
     setOpen(false)
+
+    const mapRef = useMapStore.getState().mapRef as {
+      flyTo?: (latlng: [number, number], zoom: number) => void
+      flyToBounds?: (b: [[number, number], [number, number]], o: object) => void
+    } | null
+
+    const isOnMapPage = pathname === "/map"
+
+    if (isOnMapPage && mapRef) {
+      if (result.boundingBox && mapRef.flyToBounds) {
+        mapRef.flyToBounds(result.boundingBox as [[number, number], [number, number]], { padding: [40, 40] })
+      } else {
+        mapRef.flyTo?.([result.latitude, result.longitude], 13)
+      }
+    } else {
+      // Not on map page — navigate there with coords in URL so MapUrlNavigator picks them up
+      router.push(`/map?lat=${result.latitude}&lng=${result.longitude}&zoom=13`)
+    }
   }
 
   const typeIcons: Record<string, string> = {
@@ -73,11 +82,11 @@ export function LocationSearch() {
       </div>
 
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg border border-slate-200 shadow-lg z-[9999] overflow-hidden max-h-64 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg border border-slate-200 shadow-xl z-[9999] overflow-hidden max-h-72 overflow-y-auto">
           {loading && (
             <div className="flex items-center gap-2 px-3 py-3 text-sm text-slate-500">
               <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              Searching...
+              Searching Florida locations...
             </div>
           )}
           {!loading && results.length > 0 && results.map((result) => (
@@ -98,7 +107,7 @@ export function LocationSearch() {
           ))}
           {!loading && results.length === 0 && (
             <div className="px-3 py-2.5 text-sm text-slate-500">
-              No locations found for &ldquo;{query}&rdquo;
+              No Florida locations found for &ldquo;{query}&rdquo;
             </div>
           )}
         </div>
