@@ -17,15 +17,19 @@ export function Header() {
   }
 
   return (
-    <header className="h-14 bg-white border-b border-slate-200 flex items-center gap-3 px-4 sticky top-0 z-30">
-      <div className="flex-1 max-w-md">
+    <header className="h-14 bg-white border-b border-slate-200 flex items-center gap-2 px-3 sm:px-4 sticky top-0 z-[800] flex-shrink-0">
+      <div className="flex-1 min-w-0">
         <LocationSearch />
       </div>
-      <div className="flex items-center gap-2 ml-auto">
-        <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh data">
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleRefresh}
+        title="Refresh data"
+        className="flex-shrink-0 h-9 w-9"
+      >
+        <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+      </Button>
     </header>
   )
 }

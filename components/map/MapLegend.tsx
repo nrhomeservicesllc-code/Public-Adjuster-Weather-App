@@ -8,7 +8,7 @@ export function MapLegend() {
   const [open, setOpen] = useState(true)
 
   return (
-    <div className="absolute bottom-10 right-3 z-[400] bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden">
+    <div className="absolute bottom-3 right-3 z-[400] bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden md:bottom-10">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center justify-between w-full px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
