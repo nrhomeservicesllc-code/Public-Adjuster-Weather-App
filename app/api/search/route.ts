@@ -1,16 +1,29 @@
+import { searchFLLocations } from "@/lib/florida-locations"
 import { prisma } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
+// Strip anything that isn't alphanumeric, space, period, hyphen, or apostrophe
+function sanitizeQuery(q: string): string {
+  return q.replace(/[^a-zA-Z0-9\s.\-']/g, "").trim().slice(0, 80)
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const q = searchParams.get("q")?.trim()
+  const raw = searchParams.get("q") ?? ""
+  const q = sanitizeQuery(raw)
 
-  if (!q || q.length < 2) return Response.json([])
+  if (q.length < 2) return Response.json([])
 
+  // 1. Static FL location data — instant, no network needed
+  const staticResults = searchFLLocations(q, 8)
+  if (staticResults.length > 0) {
+    return Response.json(staticResults)
+  }
+
+  // 2. DB locations (seeded data)
   try {
-    // Try DB first
-    const locations = await prisma.location.findMany({
+    const dbResults = await prisma.location.findMany({
       where: {
         state: "FL",
         OR: [
@@ -23,20 +36,22 @@ export async function GET(req: Request) {
       take: 8,
       orderBy: [{ type: "asc" }, { name: "asc" }],
     })
-
-    if (locations.length > 0) {
-      return Response.json(locations.map((l) => ({ ...l, boundingBox: l.boundingBox ?? null })))
+    if (dbResults.length > 0) {
+      return Response.json(dbResults.map((l) => ({ ...l, boundingBox: l.boundingBox ?? null })))
     }
+  } catch {
+    // DB might be unavailable — continue to Nominatim fallback
+  }
 
-    // Fallback: Nominatim geocoding
-    const nominatimUrl =
+  // 3. Nominatim geocoding — last resort, short timeout
+  try {
+    const url =
       `https://nominatim.openstreetmap.org/search` +
-      `?q=${encodeURIComponent(q + ", Florida, USA")}` +
-      `&format=json&limit=8&countrycodes=us&addressdetails=1`
+      `?q=${encodeURIComponent(q + " Florida")}&format=json&limit=6&countrycodes=us&addressdetails=1`
 
-    const res = await fetch(nominatimUrl, {
-      headers: { "User-Agent": "storm-impact-map/1.0 (admin@stormimpactmap.com)" },
-      signal: AbortSignal.timeout(5000),
+    const res = await fetch(url, {
+      headers: { "User-Agent": "ClaimCast/1.0 contact@claimcast.com" },
+      signal: AbortSignal.timeout(4000),
     })
 
     if (res.ok) {
@@ -44,15 +59,7 @@ export async function GET(req: Request) {
         place_id: string
         display_name: string
         addresstype?: string
-        type?: string
-        address?: {
-          city?: string
-          town?: string
-          village?: string
-          county?: string
-          state?: string
-          postcode?: string
-        }
+        address?: { city?: string; town?: string; village?: string; county?: string; state?: string; postcode?: string }
         lat: string
         lon: string
         boundingbox?: string[]
@@ -65,22 +72,15 @@ export async function GET(req: Request) {
         })
         .map((item) => {
           const cityName =
-            item.address?.city ??
-            item.address?.town ??
-            item.address?.village ??
+            item.address?.city ?? item.address?.town ?? item.address?.village ??
             item.display_name.split(",")[0].trim()
-
-          const type = item.addresstype === "postcode" ? "ZIP"
+          const type =
+            item.addresstype === "postcode" ? "ZIP"
             : item.addresstype === "administrative" ? "COUNTY"
             : "CITY"
-
           const bb = item.boundingbox
-          const boundingBox = bb
-            ? [[parseFloat(bb[0]), parseFloat(bb[2])], [parseFloat(bb[1]), parseFloat(bb[3])]]
-            : null
-
           return {
-            id: `nominatim-${item.place_id}`,
+            id: `nom-${item.place_id}`,
             name: cityName,
             displayName: item.display_name,
             type,
@@ -89,16 +89,17 @@ export async function GET(req: Request) {
             zipCode: item.address?.postcode ?? null,
             latitude: parseFloat(item.lat),
             longitude: parseFloat(item.lon),
-            boundingBox,
+            boundingBox: bb
+              ? [[parseFloat(bb[0]), parseFloat(bb[2])], [parseFloat(bb[1]), parseFloat(bb[3])]]
+              : null,
           }
         })
 
       return Response.json(results)
     }
-
-    return Response.json([])
-  } catch (err) {
-    console.error("Search error:", err)
-    return Response.json([])
+  } catch {
+    // Nominatim unavailable — return empty
   }
+
+  return Response.json([])
 }

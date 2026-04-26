@@ -2,7 +2,7 @@ import type { NWSAlertCollection } from "@/types"
 
 const NWS_BASE = "https://api.weather.gov"
 const NWS_HEADERS = {
-  "User-Agent": "(storm-impact-map, admin@stormimpactmap.com)",
+  "User-Agent": "ClaimCast/1.0 (contact@claimcast.com)",
   Accept: "application/geo+json",
 }
 
@@ -10,6 +10,7 @@ export async function fetchFloridaAlerts(): Promise<NWSAlertCollection> {
   const res = await fetch(`${NWS_BASE}/alerts/active?area=FL`, {
     headers: NWS_HEADERS,
     next: { revalidate: 300 },
+    signal: AbortSignal.timeout(8000),
   })
   if (!res.ok) {
     throw new Error(`NWS alerts API error: ${res.status} ${res.statusText}`)
@@ -18,12 +19,17 @@ export async function fetchFloridaAlerts(): Promise<NWSAlertCollection> {
 }
 
 export async function fetchZoneGeometry(zoneType: string, zoneId: string) {
-  const res = await fetch(`${NWS_BASE}/zones/${zoneType}/${zoneId}`, {
-    headers: NWS_HEADERS,
-  })
-  if (!res.ok) return null
-  const data = await res.json()
-  return data?.geometry ?? null
+  try {
+    const res = await fetch(`${NWS_BASE}/zones/${zoneType}/${zoneId}`, {
+      headers: NWS_HEADERS,
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.geometry ?? null
+  } catch {
+    return null
+  }
 }
 
 export async function fetchLocalStormReports() {
@@ -32,6 +38,7 @@ export async function fetchLocalStormReports() {
     offices.map((office) =>
       fetch(`${NWS_BASE}/products?type=LSR&location=${office}`, {
         headers: NWS_HEADERS,
+        signal: AbortSignal.timeout(5000),
       }).then((r) => (r.ok ? r.json() : null))
     )
   )

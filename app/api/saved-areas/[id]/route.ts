@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const area = await prisma.savedArea.findFirst({ where: { id, userId: session.user.id } })
   if (!area) return Response.json({ error: "Not found" }, { status: 404 })
 
-  const updated = await prisma.savedArea.update({ where: { id }, data: parsed.data })
+  const updated = await prisma.savedArea.update({ where: { id, userId: session.user.id }, data: parsed.data })
   return Response.json(updated)
 }
 

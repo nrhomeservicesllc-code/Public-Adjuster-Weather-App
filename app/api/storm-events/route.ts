@@ -5,11 +5,31 @@ import { normalizeNWSEventType, NWS_SEVERITY_MAP } from "@/lib/stormColors"
 
 export const dynamic = "force-dynamic"
 
-/** Compute centroid of a polygon ring */
-function ringCentroid(coords: number[][]): [number, number] {
-  const lat = coords.reduce((s, c) => s + c[1], 0) / coords.length
-  const lng = coords.reduce((s, c) => s + c[0], 0) / coords.length
-  return [lat, lng]
+/** Centroid of a GeoJSON ring (coords are [lng, lat] pairs) */
+function ringCentroid(ring: number[][]): { lat: number; lng: number } {
+  const lng = ring.reduce((s, c) => s + c[0], 0) / ring.length
+  const lat = ring.reduce((s, c) => s + c[1], 0) / ring.length
+  return { lat, lng }
+}
+
+/** Extract lat/lng from any GeoJSON geometry */
+function geometryCenter(geom: { type: string; coordinates: unknown } | null): { lat: number; lng: number } | null {
+  if (!geom) return null
+  try {
+    if (geom.type === "Point") {
+      const [lng, lat] = geom.coordinates as number[]
+      return { lat, lng }
+    }
+    if (geom.type === "Polygon") {
+      return ringCentroid((geom.coordinates as number[][][])[0])
+    }
+    if (geom.type === "MultiPolygon") {
+      return ringCentroid(((geom.coordinates as number[][][][])[0])[0])
+    }
+  } catch {
+    return null
+  }
+  return null
 }
 
 export async function GET(req: Request) {
@@ -17,29 +37,35 @@ export async function GET(req: Request) {
 
   const since = searchParams.get("since")
   const until = searchParams.get("until")
-  const types = searchParams.getAll("type")
-  const severities = searchParams.getAll("severity")
-  const bbox = searchParams.get("bbox")
-  const state = searchParams.get("state") ?? "FL"
+  const types = searchParams.getAll("type").filter((t) => /^[A-Z_]+$/.test(t))
+  const severities = searchParams.getAll("severity").filter((s) => /^[A-Z]+$/.test(s))
+  const bboxRaw = searchParams.get("bbox")
+  const state = /^[A-Z]{2}$/.test(searchParams.get("state") ?? "") ? (searchParams.get("state") ?? "FL") : "FL"
 
-  // Default to 30 days so fresh deploys show data
   const sinceDate = since ? new Date(since) : getSinceDate("30d")
   const untilDate = until ? new Date(until) : undefined
 
+  if (isNaN(sinceDate.getTime())) {
+    return Response.json({ error: "Invalid since date" }, { status: 400 })
+  }
+
   const where: Record<string, unknown> = {
     state,
-    startTime: {
-      gte: sinceDate,
-      ...(untilDate && { lte: untilDate }),
-    },
+    startTime: { gte: sinceDate, ...(untilDate && !isNaN(untilDate.getTime()) && { lte: untilDate }) },
   }
 
   if (types.length > 0) where.eventType = { in: types }
   if (severities.length > 0) where.severity = { in: severities }
 
-  if (bbox) {
-    const parts = bbox.split(",").map(Number)
-    if (parts.length === 4 && !parts.some(isNaN)) {
+  if (bboxRaw) {
+    const parts = bboxRaw.split(",").map(Number)
+    if (
+      parts.length === 4 &&
+      !parts.some(isNaN) &&
+      parts[1] >= -90 && parts[3] <= 90 &&
+      parts[0] >= -180 && parts[2] <= 180 &&
+      parts[1] <= parts[3] && parts[0] <= parts[2]
+    ) {
       const [minLng, minLat, maxLng, maxLat] = parts
       where.latitude = { gte: minLat, lte: maxLat }
       where.longitude = { gte: minLng, lte: maxLng }
@@ -52,58 +78,30 @@ export async function GET(req: Request) {
       orderBy: { startTime: "desc" },
       take: 500,
       select: {
-        id: true,
-        externalId: true,
-        source: true,
-        sourceUrl: true,
-        eventType: true,
-        severity: true,
-        confidenceLevel: true,
-        locationName: true,
-        state: true,
-        county: true,
-        zipCode: true,
-        latitude: true,
-        longitude: true,
-        startTime: true,
-        endTime: true,
-        windSpeedMph: true,
-        hailSizeInches: true,
-        rainfallInches: true,
-        tornadoEF: true,
-        description: true,
-        createdAt: true,
+        id: true, externalId: true, source: true, sourceUrl: true,
+        eventType: true, severity: true, confidenceLevel: true,
+        locationName: true, state: true, county: true, zipCode: true,
+        latitude: true, longitude: true, startTime: true, endTime: true,
+        windSpeedMph: true, hailSizeInches: true, rainfallInches: true,
+        tornadoEF: true, description: true, createdAt: true,
       },
     })
 
     if (events.length > 0) return Response.json(events)
 
-    // DB is empty — fall back to live NWS alerts converted to event format
+    // DB empty — convert live NWS alerts to event format so map always shows data
     const collection = await fetchFloridaAlerts()
     const now = new Date().toISOString()
 
-    const fallbackEvents = collection.features
+    const liveEvents = collection.features
       .filter((f) => f.properties.status === "Actual")
       .map((f) => {
-        let lat: number | null = null
-        let lng: number | null = null
-
-        if (f.geometry?.type === "Point") {
-          const [lo, la] = f.geometry.coordinates as number[]
-          lat = la; lng = lo
-        } else if (f.geometry?.type === "Polygon") {
-          const [la, lo] = ringCentroid((f.geometry.coordinates as number[][][])[0])
-          lat = la; lng = lo
-        } else if (f.geometry?.type === "MultiPolygon") {
-          const [la, lo] = ringCentroid(((f.geometry.coordinates as number[][][][])[0])[0])
-          lat = la; lng = lo
-        }
-
+        const center = geometryCenter(f.geometry)
         const areaName = f.properties.areaDesc.split(";")[0].trim()
         return {
           id: `nws-live-${f.properties.id}`,
           externalId: f.properties.id,
-          source: "NWS",
+          source: "NWS_LIVE",
           sourceUrl: f.properties.url ?? null,
           eventType: normalizeNWSEventType(f.properties.event),
           severity: NWS_SEVERITY_MAP[f.properties.severity] ?? "LOW",
@@ -112,8 +110,8 @@ export async function GET(req: Request) {
           state: "FL",
           county: null,
           zipCode: null,
-          latitude: lat,
-          longitude: lng,
+          latitude: center?.lat ?? null,
+          longitude: center?.lng ?? null,
           startTime: f.properties.effective,
           endTime: f.properties.expires,
           windSpeedMph: null,
@@ -125,7 +123,7 @@ export async function GET(req: Request) {
         }
       })
 
-    return Response.json(fallbackEvents)
+    return Response.json(liveEvents)
   } catch (err) {
     console.error("Storm events error:", err)
     return Response.json({ error: "Failed to fetch storm events" }, { status: 500 })

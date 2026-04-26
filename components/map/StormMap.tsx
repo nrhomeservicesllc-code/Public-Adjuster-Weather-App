@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import L from "leaflet"
+import { useSearchParams } from "next/navigation"
 import { StormEventLayer } from "./StormEventLayer"
 import { AlertLayer } from "./AlertLayer"
 import { MapLegend } from "./MapLegend"
@@ -28,6 +29,26 @@ function MapRefCapture() {
   return null
 }
 
+/** Reads ?lat, ?lng, ?zoom URL params and flies the map there on mount. */
+function MapUrlNavigator() {
+  const map = useMap()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const lat = parseFloat(searchParams.get("lat") ?? "")
+    const lng = parseFloat(searchParams.get("lng") ?? "")
+    const zoom = parseInt(searchParams.get("zoom") ?? "12", 10)
+
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      const safeZoom = Math.min(Math.max(zoom, 4), 18)
+      map.flyTo([lat, lng], safeZoom, { animate: true, duration: 1.2 })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map])
+
+  return null
+}
+
 export function StormMap() {
   return (
     <div className="relative h-full w-full">
@@ -47,6 +68,7 @@ export function StormMap() {
         />
         <ZoomControl position="bottomright" />
         <MapRefCapture />
+        <MapUrlNavigator />
         <AlertLayer />
         <StormEventLayer />
       </MapContainer>
