@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import {
   MapPin, Zap, FileText, Bell, Shield, BarChart3,
@@ -8,6 +9,18 @@ import {
   Smartphone, Monitor, Tablet, Globe
 } from "lucide-react"
 import { ClaimCastIcon, ClaimCastWordmark } from "@/components/ClaimCastLogo"
+
+const LandingMapPreview = dynamic(
+  () => import("@/components/landing/LandingMapPreview").then((m) => ({ default: m.LandingMapPreview })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full bg-slate-100 animate-pulse flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    ),
+  }
+)
 
 // ─── Navbar ──────────────────────────────────────────────────────────────────
 function Navbar() {
@@ -111,7 +124,7 @@ function AppMockup() {
         </div>
 
         {/* App UI */}
-        <div className="flex" style={{ height: 340 }}>
+        <div className="flex" style={{ height: 360 }}>
           {/* Sidebar */}
           <div className="w-14 bg-[#0A0F1E] flex flex-col items-center py-4 gap-5 border-r border-white/5 flex-shrink-0">
             <ClaimCastIcon size={28} />
@@ -129,59 +142,23 @@ function AppMockup() {
             </div>
           </div>
 
-          {/* Map area */}
-          <div className="flex-1 relative bg-[#1a2535] overflow-hidden">
-            {/* Grid lines */}
-            {[...Array(8)].map((_, i) => (
-              <div key={`h${i}`} className="absolute left-0 right-0 border-t border-white/[0.04]" style={{ top: `${i * 12.5}%` }} />
-            ))}
-            {[...Array(10)].map((_, i) => (
-              <div key={`v${i}`} className="absolute top-0 bottom-0 border-l border-white/[0.04]" style={{ left: `${i * 10}%` }} />
-            ))}
-
-            {/* Roads */}
-            <div className="absolute" style={{ top: "42%", left: "5%", right: "5%", height: 1.5, background: "rgba(148,163,184,0.15)" }} />
-            <div className="absolute" style={{ top: "68%", left: "10%", right: "10%", height: 1.5, background: "rgba(148,163,184,0.12)" }} />
-            <div className="absolute" style={{ left: "35%", top: "5%", bottom: "5%", width: 1.5, background: "rgba(148,163,184,0.12)" }} />
-            <div className="absolute" style={{ left: "65%", top: "5%", bottom: "5%", width: 1.5, background: "rgba(148,163,184,0.1)" }} />
-
-            {/* Storm impact circles */}
-            <div className="absolute rounded-full border border-red-500/30 animate-ping" style={{ width: 80, height: 80, top: "12%", left: "25%", animationDuration: "3s" }} />
-            <div className="absolute rounded-full" style={{ width: 80, height: 80, top: "12%", left: "25%", background: "radial-gradient(circle, rgba(239,68,68,0.12) 0%, transparent 70%)" }} />
-
-            <div className="absolute rounded-full border border-orange-500/25" style={{ width: 110, height: 110, top: "35%", left: "52%", background: "radial-gradient(circle, rgba(249,115,22,0.1) 0%, transparent 70%)" }} />
-
-            <div className="absolute rounded-full border border-blue-500/25" style={{ width: 90, height: 90, top: "55%", left: "15%", background: "radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)" }} />
-
-            {/* Storm dots */}
-            {[
-              { x: "28%", y: "18%", color: "#EF4444", label: "Tornado" },
-              { x: "60%", y: "42%", color: "#F97316", label: "Hail" },
-              { x: "20%", y: "62%", color: "#3B82F6", label: "Flood" },
-              { x: "45%", y: "25%", color: "#EAB308", label: "Wind" },
-              { x: "72%", y: "65%", color: "#4F46E5", label: "Storm" },
-              { x: "38%", y: "72%", color: "#F97316", label: "Hail" },
-              { x: "82%", y: "30%", color: "#EF4444", label: "Tornado" },
-            ].map((dot, i) => (
-              <div key={i} className="absolute" style={{ left: dot.x, top: dot.y }}>
-                <div className="w-3 h-3 rounded-full border-2 border-white/50 shadow-lg transform -translate-x-1/2 -translate-y-1/2"
-                  style={{ backgroundColor: dot.color, boxShadow: `0 0 8px ${dot.color}80` }} />
-              </div>
-            ))}
+          {/* Map area — real Leaflet map with CartoDB tiles */}
+          <div className="flex-1 relative overflow-hidden">
+            <LandingMapPreview />
 
             {/* Active alert card overlay */}
-            <div className="absolute top-3 right-3 bg-[#0F172A]/90 backdrop-blur-sm border border-white/10 rounded-xl p-3 text-xs" style={{ width: 150 }}>
+            <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl p-3 text-xs shadow-lg z-[400]" style={{ width: 155 }}>
               <div className="flex items-center gap-1.5 mb-2">
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-white font-semibold">3 Active Alerts</span>
+                <span className="text-slate-800 font-bold">3 Active Alerts</span>
               </div>
               <div className="space-y-1.5">
                 {[
-                  { label: "Tornado Warning", color: "text-red-400" },
-                  { label: "Hail Advisory", color: "text-orange-400" },
-                  { label: "Flash Flood", color: "text-blue-400" },
+                  { label: "Tornado Warning", color: "text-red-500" },
+                  { label: "Hail Advisory", color: "text-orange-500" },
+                  { label: "Flash Flood Watch", color: "text-blue-500" },
                 ].map((a) => (
-                  <div key={a.label} className={`${a.color} text-[10px] flex items-center gap-1`}>
+                  <div key={a.label} className={`${a.color} text-[10px] flex items-center gap-1 font-medium`}>
                     <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
                     {a.label}
                   </div>
@@ -190,15 +167,16 @@ function AppMockup() {
             </div>
 
             {/* Bottom filter bar */}
-            <div className="absolute bottom-0 left-0 right-0 bg-[#0F172A]/80 backdrop-blur-sm border-t border-white/5 px-3 py-2 flex items-center gap-2">
-              {["Hail", "Tornado", "Wind", "Flood"].map((t, i) => (
-                <span key={t} className={`text-[10px] px-2 py-1 rounded-full font-medium ${
-                  i === 0 ? "bg-orange-500/20 text-orange-400" :
-                  i === 1 ? "bg-red-500/20 text-red-400" :
-                  "bg-white/5 text-slate-400"
-                }`}>{t}</span>
+            <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-slate-200 px-3 py-2 flex items-center gap-2 z-[400]">
+              {[
+                { label: "Hail", cls: "bg-orange-100 text-orange-600 border border-orange-200" },
+                { label: "Tornado", cls: "bg-red-100 text-red-600 border border-red-200" },
+                { label: "Wind", cls: "bg-slate-100 text-slate-500 border border-slate-200" },
+                { label: "Flood", cls: "bg-slate-100 text-slate-500 border border-slate-200" },
+              ].map((t) => (
+                <span key={t.label} className={`text-[10px] px-2 py-1 rounded-full font-semibold ${t.cls}`}>{t.label}</span>
               ))}
-              <span className="ml-auto text-[10px] text-slate-500">47 events</span>
+              <span className="ml-auto text-[10px] text-slate-500 font-medium">10 events</span>
             </div>
           </div>
         </div>

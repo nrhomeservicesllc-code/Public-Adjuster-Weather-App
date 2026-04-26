@@ -34,7 +34,7 @@ const securityHeaders = [
       // Styles: self + inline (Tailwind + Leaflet inject inline styles)
       "style-src 'self' 'unsafe-inline'",
       // Images: self + OSM tiles + data URIs (Leaflet marker icons)
-      "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com",
+      "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://cdnjs.cloudflare.com",
       // Fonts: self
       "font-src 'self' data:",
       // Connect: self + NWS API + Nominatim (API routes proxy these, but allow direct if needed)
