@@ -72,6 +72,7 @@ export async function GET(req: Request) {
     }
   }
 
+  // 1. Try DB first
   try {
     const events = await prisma.stormEvent.findMany({
       where,
@@ -86,10 +87,14 @@ export async function GET(req: Request) {
         tornadoEF: true, description: true, createdAt: true,
       },
     })
-
     if (events.length > 0) return Response.json(events)
+  } catch (dbErr) {
+    console.error("Storm events DB fetch failed:", dbErr)
+    // fall through to NWS
+  }
 
-    // DB empty — convert live NWS alerts to event format so map always shows data
+  // 2. DB empty or unavailable — convert live NWS alerts to event format
+  try {
     const collection = await fetchFloridaAlerts()
     const now = new Date().toISOString()
 
@@ -124,8 +129,11 @@ export async function GET(req: Request) {
       })
 
     return Response.json(liveEvents)
-  } catch (err) {
-    console.error("Storm events error:", err)
-    return Response.json({ error: "Failed to fetch storm events" }, { status: 500 })
+  } catch (nwsErr) {
+    console.error("Storm events NWS fetch failed:", nwsErr)
+    // fall through to empty response
   }
+
+  // 3. Both unavailable — return empty so the UI shows gracefully
+  return Response.json([])
 }
