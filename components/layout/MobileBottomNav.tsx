@@ -6,18 +6,21 @@ import { Map, Bookmark, FileText, Settings, Newspaper } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { href: "/map",         icon: Map,      label: "Map"     },
-  { href: "/news",        icon: Newspaper, label: "News"   },
-  { href: "/saved-areas", icon: Bookmark, label: "Saved"  },
-  { href: "/reports",     icon: FileText, label: "Reports" },
-  { href: "/admin",       icon: Settings, label: "Admin"  },
+  { href: "/map",         icon: Map,       label: "Map"     },
+  { href: "/news",        icon: Newspaper, label: "News"    },
+  { href: "/saved-areas", icon: Bookmark,  label: "Saved"   },
+  { href: "/reports",     icon: FileText,  label: "Reports" },
+  { href: "/admin",       icon: Settings,  label: "Admin"   },
 ]
 
 export function MobileBottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[2000] bg-[#0A0F1E] border-t border-white/10 pb-safe">
+    <nav
+      className="md:hidden fixed bottom-0 left-0 right-0 z-[2000] bg-[#0A0F1E] border-t border-white/10"
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+    >
       <div className="grid grid-cols-5">
         {navItems.map(({ href, icon: Icon, label }) => (
           <Link

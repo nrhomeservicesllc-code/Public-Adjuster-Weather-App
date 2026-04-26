@@ -4,7 +4,6 @@ import { useEffect } from "react"
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import L from "leaflet"
-import { useSearchParams } from "next/navigation"
 import { StormEventLayer } from "./StormEventLayer"
 import { AlertLayer } from "./AlertLayer"
 import { MapLegend } from "./MapLegend"
@@ -29,21 +28,32 @@ function MapRefCapture() {
   return null
 }
 
-/** Reads ?lat, ?lng, ?zoom URL params and flies the map there on mount. */
+/**
+ * Reads ?lat, ?lng, ?zoom from the current URL and flies the map there.
+ * Uses window.location.search directly to avoid the Suspense requirement
+ * that useSearchParams() imposes in Next.js 15 App Router.
+ */
 function MapUrlNavigator() {
   const map = useMap()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
-    const lat = parseFloat(searchParams.get("lat") ?? "")
-    const lng = parseFloat(searchParams.get("lng") ?? "")
-    const zoom = parseInt(searchParams.get("zoom") ?? "12", 10)
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const lat = parseFloat(params.get("lat") ?? "")
+    const lng = parseFloat(params.get("lng") ?? "")
+    const zoom = parseInt(params.get("zoom") ?? "12", 10)
 
-    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      const safeZoom = Math.min(Math.max(zoom, 4), 18)
-      map.flyTo([lat, lng], safeZoom, { animate: true, duration: 1.2 })
+    if (
+      !isNaN(lat) && !isNaN(lng) &&
+      lat >= -90 && lat <= 90 &&
+      lng >= -180 && lng <= 180
+    ) {
+      const safeZoom = Math.min(Math.max(isNaN(zoom) ? 12 : zoom, 4), 18)
+      // Small timeout lets the map finish its initial render before flying
+      setTimeout(() => {
+        map.flyTo([lat, lng], safeZoom, { animate: true, duration: 1.0 })
+      }, 300)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map])
 
   return null
