@@ -57,8 +57,10 @@ export async function syncAlerts(): Promise<{ synced: number; errors: string[] }
       }
     }
 
+    // Keep alerts for 25h after expiry so the 24h grace window in the API stays intact
+    const cutoff = new Date(Date.now() - 25 * 60 * 60 * 1000)
     await prisma.alert.deleteMany({
-      where: { expires: { lt: new Date() } },
+      where: { expires: { lt: cutoff } },
     })
   } catch (err) {
     errors.push(`Fetch error: ${String(err)}`)

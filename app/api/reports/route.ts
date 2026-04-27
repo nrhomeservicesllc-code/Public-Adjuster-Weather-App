@@ -17,7 +17,11 @@ export async function GET() {
   if (!session?.user?.id) return Response.json({ error: "Unauthorized" }, { status: 401 })
 
   const reports = await prisma.report.findMany({
-    where: { userId: session.user.id },
+    where: {
+      userId: session.user.id,
+      // Filter out internal notification dedup records created by the notify cron
+      NOT: { areaName: { startsWith: "notify:" } },
+    },
     orderBy: { generatedAt: "desc" },
     take: 50,
   })
