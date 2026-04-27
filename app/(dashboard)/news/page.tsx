@@ -398,7 +398,7 @@ function AlertCard({ alert }: { alert: NWSAlert }) {
               {expanded ? "Hide full alert text" : "Read full NWS alert"}
             </button>
             {expanded && (
-              <div className="mt-2 text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3 whitespace-pre-wrap border border-slate-100 max-h-64 overflow-y-auto">
+              <div className="mt-2 text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3 whitespace-pre-wrap border border-slate-100">
                 {alert.description}
               </div>
             )}
