@@ -10,7 +10,7 @@ interface EmailPayload {
 
 export async function sendEmail({ to, subject, html }: EmailPayload): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.EMAIL_FROM ?? "ClaimCast <alerts@claimcast.app>"
+  const from = process.env.EMAIL_FROM ?? "ClaimCast <onboarding@resend.dev>"
 
   if (!apiKey) {
     console.log(`[email] RESEND_API_KEY not set — would send to ${to}: ${subject}`)
