@@ -112,15 +112,23 @@ function EventCard({ event }: { event: StormEvent }) {
   const router = useRouter()
   const [expanded, setExpanded] = useState(false)
   const color = getStormColor(event.eventType)
-  const hasCoords = event.latitude != null && event.longitude != null
   const radius = estimateRadiusMiles(
     event.eventType, event.severity,
     event.windSpeedMph, event.hailSizeInches, event.rainfallInches, event.tornadoEF,
   )
 
+  // Use direct coords if available, otherwise resolve from locationName
+  const coords = (event.latitude != null && event.longitude != null)
+    ? { lat: event.latitude, lng: event.longitude }
+    : (() => {
+        const hits = searchFLLocations(event.locationName, 1)
+        return hits.length > 0 ? { lat: hits[0].latitude, lng: hits[0].longitude } : null
+      })()
+  const hasCoords = coords !== null
+
   const goToMap = () => {
-    if (hasCoords) {
-      router.push(`/map?lat=${event.latitude}&lng=${event.longitude}&zoom=12&eid=${event.id}`)
+    if (coords) {
+      router.push(`/map?lat=${coords.lat}&lng=${coords.lng}&zoom=12&eid=${event.id}`)
     }
   }
 
@@ -230,7 +238,7 @@ function EventCard({ event }: { event: StormEvent }) {
           {hasCoords && (
             <div className="col-span-2 sm:col-span-3">
               <div className="text-slate-400 mb-0.5 uppercase tracking-wide text-[10px]">Coordinates</div>
-              <div className="font-mono text-xs text-slate-700">{event.latitude?.toFixed(4)}, {event.longitude?.toFixed(4)}</div>
+              <div className="font-mono text-xs text-slate-700">{coords?.lat.toFixed(4)}, {coords?.lng.toFixed(4)}</div>
             </div>
           )}
         </div>
