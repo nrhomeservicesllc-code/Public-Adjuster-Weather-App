@@ -27,7 +27,7 @@ export function Header() {
         /* On the map page the search lives in the MapSearchOverlay overlay.
            Show the logo here so the header isn't empty. */
         <>
-          <Link href="/map" className="flex-shrink-0">
+          <Link href="/" className="flex-shrink-0">
             <ClaimCastWordmark />
           </Link>
           <div className="flex-1" />

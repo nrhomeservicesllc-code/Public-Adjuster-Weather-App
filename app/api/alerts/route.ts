@@ -36,10 +36,11 @@ export async function GET() {
     // fall through to DB
   }
 
-  // 2. Try cached DB alerts
+  // 2. Try cached DB alerts — keep alerts visible for 24h after expiry
   try {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const alerts = await prisma.alert.findMany({
-      where: { expires: { gte: new Date() } },
+      where: { expires: { gte: cutoff } },
       orderBy: { effective: "desc" },
       take: 200,
     })

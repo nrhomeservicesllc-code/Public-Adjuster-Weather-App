@@ -4,6 +4,7 @@ import { Popup } from "react-leaflet"
 import { ExternalLink, FileText, Copy, Wind, Droplets, Tornado } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { SaveAreaDialog } from "@/components/workflow/SaveAreaDialog"
 import { getStormColor } from "@/lib/stormColors"
 import { formatDate } from "@/lib/utils"
 import type { StormEvent } from "@/types"
@@ -163,7 +164,7 @@ export function StormPopup({ event, nearbyCount }: Props) {
         </p>
 
         {/* Actions */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           <Button
             size="sm"
             variant="outline"
@@ -173,13 +174,22 @@ export function StormPopup({ event, nearbyCount }: Props) {
             <Copy className="h-3 w-3 mr-1" />
             Copy
           </Button>
+          <SaveAreaDialog
+            geoJson={{ type: "Point", coordinates: [event.longitude, event.latitude] }}
+            defaultName={`${color.label} — ${event.locationName}`}
+            trigger={
+              <Button size="sm" variant="outline" className="text-xs h-8 flex-1">
+                📍 Save Area
+              </Button>
+            }
+          />
           <Button
             size="sm"
-            className="text-xs h-8 flex-1"
+            className="text-xs h-8 w-full mt-0.5"
             onClick={createReport}
           >
             <FileText className="h-3 w-3 mr-1" />
-            Save Report
+            Save to Previous Reports
           </Button>
         </div>
       </div>

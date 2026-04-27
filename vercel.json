@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/sync-storm-events",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/archive-alerts",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/notify-saved-areas",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

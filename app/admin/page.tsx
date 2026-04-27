@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db"
 import { formatDate } from "@/lib/utils"
 import { Shield, Users, Bell, Activity, RefreshCw, Database } from "lucide-react"
@@ -19,12 +20,12 @@ export default async function AdminPage() {
       prisma.report.count(),
       prisma.alert.findMany({
         orderBy: { createdAt: "desc" },
-        take: 8,
+        take: 20,
         select: { id: true, title: true, areaDesc: true, severity: true, expires: true, createdAt: true },
       }),
       prisma.stormEvent.findMany({
         orderBy: { startTime: "desc" },
-        take: 8,
+        take: 20,
         select: { id: true, eventType: true, locationName: true, severity: true, startTime: true, source: true },
       }),
     ])
@@ -32,12 +33,29 @@ export default async function AdminPage() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Shield className="h-7 w-7 text-blue-700" />
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
-          <p className="text-sm text-slate-500">Signed in as admin: {session.user.email}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Shield className="h-7 w-7 text-blue-700" />
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+            <p className="text-sm text-slate-500">Signed in as admin: {session.user.email}</p>
+          </div>
         </div>
+        <form
+          action={async () => {
+            "use server"
+            revalidatePath("/admin")
+          }}
+        >
+          <button
+            type="submit"
+            className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors"
+            title="Refresh dashboard data"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+        </form>
       </div>
 
       {/* Stats */}

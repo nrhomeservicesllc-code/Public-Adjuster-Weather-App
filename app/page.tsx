@@ -198,6 +198,106 @@ function AppMockup() {
   )
 }
 
+// ─── Pricing ─────────────────────────────────────────────────────────────────
+function PricingSection() {
+  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly")
+  const isYearly = billing === "yearly"
+
+  return (
+    <section id="pricing" className="py-24 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="text-center mb-12">
+        <h2 className="text-4xl sm:text-5xl font-black text-white mb-4 tracking-tight">Simple pricing</h2>
+        <p className="text-slate-400 text-lg mb-8">Start free. Upgrade when you&apos;re ready to scale.</p>
+
+        {/* Billing toggle */}
+        <div className="inline-flex items-center gap-1 bg-white/[0.05] border border-white/10 rounded-xl p-1">
+          <button
+            onClick={() => setBilling("monthly")}
+            className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${!isYearly ? "bg-white text-slate-900 shadow" : "text-slate-400 hover:text-white"}`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setBilling("yearly")}
+            className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isYearly ? "bg-white text-slate-900 shadow" : "text-slate-400 hover:text-white"}`}
+          >
+            Yearly
+            <span className="text-[10px] bg-green-500 text-white font-black px-1.5 py-0.5 rounded-full">SAVE $189</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        {/* Starter */}
+        <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-8">
+          <div className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Starter</div>
+          <div className="text-5xl font-black text-white mb-1">Free</div>
+          <div className="text-slate-500 text-sm mb-8">Forever free · No card needed</div>
+          <ul className="space-y-3 mb-8">
+            {[
+              "Live NWS alerts on the map",
+              "7-day storm event history",
+              "3 saved areas",
+              "5 PDF reports per month",
+              "All storm categories",
+              "Search any FL location",
+            ].map((f) => (
+              <li key={f} className="flex items-center gap-2.5 text-sm text-slate-300">
+                <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
+                {f}
+              </li>
+            ))}
+          </ul>
+          <Link href="/register" className="block text-center py-3 rounded-xl border border-white/10 text-white font-semibold hover:bg-white/5 transition-colors">
+            Get Started Free
+          </Link>
+        </div>
+
+        {/* Pro */}
+        <div className="relative bg-gradient-to-b from-blue-600/20 to-cyan-600/10 border border-blue-500/40 rounded-2xl p-8">
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-xs font-black px-4 py-1 rounded-full">
+            MOST POPULAR
+          </div>
+          <div className="text-sm font-semibold text-cyan-400 uppercase tracking-wide mb-3">Pro</div>
+          <div className="flex items-end gap-1 mb-1">
+            <div className="text-5xl font-black text-white">{isYearly ? "$999" : "$99"}</div>
+            <div className="text-slate-400 mb-2">{isYearly ? "/year" : "/month"}</div>
+          </div>
+          <div className="text-slate-400 text-sm mb-8">
+            {isYearly ? "Billed annually · Save $189 vs monthly" : "Billed monthly · Cancel anytime"}
+          </div>
+          <ul className="space-y-3 mb-8">
+            {[
+              "Everything in Starter",
+              "6-month storm event history",
+              "Unlimited saved areas",
+              "Unlimited PDF reports",
+              "Storm email alerts for saved areas",
+              "CSV data export",
+              "Priority email support",
+              "Early access to new features",
+            ].map((f) => (
+              <li key={f} className="flex items-center gap-2.5 text-sm text-slate-200">
+                <Check className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                {f}
+              </li>
+            ))}
+          </ul>
+          <Link href="/register" className="block text-center py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold hover:opacity-90 transition-opacity shadow-lg shadow-blue-500/25">
+            Start Free Trial
+          </Link>
+        </div>
+      </div>
+
+      <p className="text-center text-sm text-slate-500 mt-6">
+        Need a team plan?{" "}
+        <a href="mailto:hello@claimcast.com" className="text-blue-400 hover:underline">Contact us</a>
+        {" "}for enterprise pricing.
+      </p>
+    </section>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   return (
@@ -412,77 +512,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── PRICING ── */}
-      <section id="pricing" className="py-24 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl sm:text-5xl font-black text-white mb-4 tracking-tight">Simple pricing</h2>
-          <p className="text-slate-400 text-lg">Start free. Upgrade when you&apos;re ready to scale.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-          {/* Starter */}
-          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-8">
-            <div className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Starter</div>
-            <div className="text-5xl font-black text-white mb-1">Free</div>
-            <div className="text-slate-500 text-sm mb-8">Forever free · No card needed</div>
-            <ul className="space-y-3 mb-8">
-              {[
-                "Live NWS alerts on the map",
-                "7-day storm event history",
-                "3 saved areas",
-                "5 PDF reports per month",
-                "All storm categories",
-                "Search any FL location",
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-2.5 text-sm text-slate-300">
-                  <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/register" className="block text-center py-3 rounded-xl border border-white/10 text-white font-semibold hover:bg-white/5 transition-colors">
-              Get Started Free
-            </Link>
-          </div>
-
-          {/* Pro */}
-          <div className="relative bg-gradient-to-b from-blue-600/20 to-cyan-600/10 border border-blue-500/40 rounded-2xl p-8">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-xs font-black px-4 py-1 rounded-full">
-              MOST POPULAR
-            </div>
-            <div className="text-sm font-semibold text-cyan-400 uppercase tracking-wide mb-3">Pro</div>
-            <div className="flex items-end gap-1 mb-1">
-              <div className="text-5xl font-black text-white">$49</div>
-              <div className="text-slate-400 mb-2">/month</div>
-            </div>
-            <div className="text-slate-400 text-sm mb-8">Billed monthly · Cancel anytime</div>
-            <ul className="space-y-3 mb-8">
-              {[
-                "Everything in Starter",
-                "30-day storm event history",
-                "Unlimited saved areas",
-                "Unlimited PDF reports",
-                "CSV data export",
-                "Priority email support",
-                "Early access to new features",
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-2.5 text-sm text-slate-200">
-                  <Check className="h-4 w-4 text-cyan-400 flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/register" className="block text-center py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold hover:opacity-90 transition-opacity shadow-lg shadow-blue-500/25">
-              Start Free Trial
-            </Link>
-          </div>
-        </div>
-
-        <p className="text-center text-sm text-slate-500 mt-6">
-          Need a team plan?{" "}
-          <a href="mailto:hello@claimcast.com" className="text-blue-400 hover:underline">Contact us</a>
-          {" "}for enterprise pricing.
-        </p>
-      </section>
+      <PricingSection />
 
       {/* ── PLATFORMS ── */}
       <section id="platforms" className="py-20 bg-white/[0.02] border-y border-white/5">

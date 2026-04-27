@@ -11,7 +11,7 @@ const navItems = [
   { href: "/map", icon: Map, label: "Storm Map" },
   { href: "/news", icon: Newspaper, label: "Latest Reports" },
   { href: "/saved-areas", icon: Bookmark, label: "Saved Areas" },
-  { href: "/reports", icon: FileText, label: "My Reports" },
+  { href: "/reports", icon: FileText, label: "Previous Reports" },
 ]
 
 export function Sidebar() {
@@ -20,7 +20,9 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-60 bg-[#0A0F1E] text-white h-screen fixed left-0 top-0 z-40 border-r border-white/5">
       <div className="px-4 py-5 border-b border-white/5">
-        <ClaimCastWordmark />
+        <Link href="/" className="block">
+          <ClaimCastWordmark />
+        </Link>
         <p className="text-xs text-slate-500 mt-1 ml-11">Public Adjuster Tool</p>
       </div>
 
