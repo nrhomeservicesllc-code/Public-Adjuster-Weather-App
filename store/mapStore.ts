@@ -23,7 +23,7 @@ interface MapState {
 }
 
 const defaultFilters: MapFilters = {
-  dateRange: "30d",
+  dateRange: "24h",
   stormTypes: [],
   severities: [],
   showAlerts: true,
