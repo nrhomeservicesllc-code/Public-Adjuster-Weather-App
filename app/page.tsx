@@ -182,13 +182,13 @@ function AppMockup() {
         </div>
       </div>
 
-      {/* Floating stat cards */}
-      <div className="absolute -left-6 top-1/3 bg-[#0F172A] border border-white/10 rounded-2xl p-3 shadow-2xl hidden lg:block">
+      {/* Floating stat cards — z-10 keeps them above Leaflet's GPU compositing layers */}
+      <div className="absolute -left-6 top-1/3 bg-[#0F172A] border border-white/10 rounded-2xl p-3 shadow-2xl hidden lg:block z-10">
         <div className="text-2xl font-black text-white">47</div>
         <div className="text-xs text-slate-400">Storm events</div>
         <div className="text-xs text-green-400 font-medium mt-1">↑ Live data</div>
       </div>
-      <div className="absolute -right-6 bottom-1/4 bg-[#0F172A] border border-white/10 rounded-2xl p-3 shadow-2xl hidden lg:block">
+      <div className="absolute -right-6 bottom-1/4 bg-[#0F172A] border border-white/10 rounded-2xl p-3 shadow-2xl hidden lg:block z-10">
         <div className="text-2xl font-black text-white">3.2M</div>
         <div className="text-xs text-slate-400">Acres tracked</div>
         <div className="text-xs text-blue-400 font-medium mt-1">Florida</div>
