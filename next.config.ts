@@ -37,8 +37,8 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://cdnjs.cloudflare.com",
       // Fonts: self
       "font-src 'self' data:",
-      // Connect: self + NWS API + Nominatim (API routes proxy these, but allow direct if needed)
-      "connect-src 'self' https://api.weather.gov https://nominatim.openstreetmap.org",
+      // Connect: self + NWS API + Nominatim + Vercel Speed Insights (API routes proxy these, but allow direct if needed)
+      "connect-src 'self' https://api.weather.gov https://nominatim.openstreetmap.org https://vitals.vercel-insights.com",
       // Workers: self + blob (Leaflet uses blob workers)
       "worker-src 'self' blob:",
       // Frame: none
