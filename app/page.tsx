@@ -147,7 +147,7 @@ function AppMockup() {
             <LandingMapPreview />
 
             {/* Active alert card overlay */}
-            <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl p-3 text-xs shadow-lg z-[400]" style={{ width: 155 }}>
+            <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl p-3 text-xs shadow-lg z-[800]" style={{ width: 155 }}>
               <div className="flex items-center gap-1.5 mb-2">
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-slate-800 font-bold">3 Active Alerts</span>
@@ -166,8 +166,20 @@ function AppMockup() {
               </div>
             </div>
 
+            {/* Stat cards — inside the map area so z-index beats Leaflet GPU layers */}
+            <div className="absolute top-3 left-3 bg-[#0F172A]/90 backdrop-blur-sm border border-white/15 rounded-xl p-2.5 shadow-xl z-[800]">
+              <div className="text-xl font-black text-white leading-none">47</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Storm events</div>
+              <div className="text-[10px] text-green-400 font-semibold mt-0.5">↑ Live data</div>
+            </div>
+            <div className="absolute bottom-10 left-3 bg-[#0F172A]/90 backdrop-blur-sm border border-white/15 rounded-xl p-2.5 shadow-xl z-[800]">
+              <div className="text-xl font-black text-white leading-none">3.2M</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Acres tracked</div>
+              <div className="text-[10px] text-blue-400 font-semibold mt-0.5">Florida</div>
+            </div>
+
             {/* Bottom filter bar */}
-            <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-slate-200 px-3 py-2 flex items-center gap-2 z-[400]">
+            <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-slate-200 px-3 py-2 flex items-center gap-2 z-[800]">
               {[
                 { label: "Hail", cls: "bg-orange-100 text-orange-600 border border-orange-200" },
                 { label: "Tornado", cls: "bg-red-100 text-red-600 border border-red-200" },
@@ -182,17 +194,6 @@ function AppMockup() {
         </div>
       </div>
 
-      {/* Floating stat cards — z-10 keeps them above Leaflet's GPU compositing layers */}
-      <div className="absolute -left-6 top-1/3 bg-[#0F172A] border border-white/10 rounded-2xl p-3 shadow-2xl hidden lg:block z-10">
-        <div className="text-2xl font-black text-white">47</div>
-        <div className="text-xs text-slate-400">Storm events</div>
-        <div className="text-xs text-green-400 font-medium mt-1">↑ Live data</div>
-      </div>
-      <div className="absolute -right-6 bottom-1/4 bg-[#0F172A] border border-white/10 rounded-2xl p-3 shadow-2xl hidden lg:block z-10">
-        <div className="text-2xl font-black text-white">3.2M</div>
-        <div className="text-xs text-slate-400">Acres tracked</div>
-        <div className="text-xs text-blue-400 font-medium mt-1">Florida</div>
-      </div>
     </div>
   )
 }
