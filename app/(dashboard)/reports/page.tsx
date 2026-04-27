@@ -6,6 +6,7 @@ import dynamic from "next/dynamic"
 import { FileText, Download, Trash2, Map, Clock, AlertTriangle, Home, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/lib/utils"
+import { searchFLLocations } from "@/lib/florida-locations"
 import type { Report } from "@/types"
 
 // Leaflet needs to be client-only
@@ -70,21 +71,48 @@ const SEV_STYLE: Record<string, string> = {
   LOW:      "bg-slate-100 text-slate-600 border border-slate-200",
 }
 
-/** Extract [lat, lng] from a report's geoJson, or null */
-function getCenter(geoJson: unknown): [number, number] | null {
+/**
+ * Extract [lat, lng] from a report's geoJson.
+ * Falls back to resolving from areaName via FL locations index so the
+ * mini map always renders even when the stored coordinates are null.
+ */
+function getCenter(geoJson: unknown, areaName: string): [number, number] | null {
+  // 1. Try direct geoJson coordinates
   try {
     const geo = geoJson as { type: string; coordinates: number[] | number[][][] }
-    if (geo.type === "Point") {
+    if (geo?.type === "Point") {
       const [lng, lat] = geo.coordinates as number[]
-      return [lat, lng]
+      if (typeof lat === "number" && typeof lng === "number" && !isNaN(lat) && !isNaN(lng)) {
+        return [lat, lng]
+      }
     }
-    if (geo.type === "Polygon") {
+    if (geo?.type === "Polygon") {
       const ring = (geo.coordinates as number[][][])[0]
       const lng = ring.reduce((s, c) => s + c[0], 0) / ring.length
       const lat = ring.reduce((s, c) => s + c[1], 0) / ring.length
-      return [lat, lng]
+      if (!isNaN(lat) && !isNaN(lng)) return [lat, lng]
     }
-  } catch { /* empty */ }
+  } catch { /* fall through */ }
+
+  // 2. Resolve from areaName — try the part after the dash first ("Hail — Miami" → "Miami")
+  //    then each comma-separated token, stripping common suffixes
+  const candidates: string[] = []
+  const dashPart = areaName.split(/[—–]/).slice(1).join(" ").trim()
+  if (dashPart) {
+    dashPart.split(",").forEach((s) =>
+      candidates.push(s.trim().replace(/\s+(co\.|county|fl|florida)\.?$/i, "").trim())
+    )
+  }
+  // Also try the full name and first token before a dash
+  candidates.push(areaName.split(/[—–]/)[0].trim())
+  candidates.push(areaName.replace(/\s+(co\.|county|nws alert).*$/i, "").trim())
+
+  for (const term of candidates) {
+    if (term.length < 3) continue
+    const hits = searchFLLocations(term, 1)
+    if (hits.length > 0) return [hits[0].latitude, hits[0].longitude]
+  }
+
   return null
 }
 
@@ -116,7 +144,7 @@ export default function ReportsPage() {
   }
 
   const viewOnMap = (report: Report) => {
-    const center = getCenter(report.geoJson)
+    const center = getCenter(report.geoJson, report.areaName)
     if (!center) return
     const [lat, lng] = center
     const eid = report.stormEventIds[0] ?? ""
@@ -170,7 +198,7 @@ export default function ReportsPage() {
       ) : (
         <div className="space-y-4">
           {reports.map((report) => {
-            const center = getCenter(report.geoJson)
+            const center = getCenter(report.geoJson, report.areaName)
             const stormType = parseStormType(report.areaName)
             const severity = parseSeverity(report.summary, report.areaName)
             const radiusM = impactRadiusM(stormType, severity)
