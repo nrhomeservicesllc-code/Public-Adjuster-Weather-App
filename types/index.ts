@@ -18,7 +18,7 @@ export type ConfidenceLevel =
 
 export type Role = "USER" | "ADMIN"
 
-export type DateRange = "24h" | "3d" | "7d" | "30d" | "custom"
+export type DateRange = "24h" | "3d" | "7d" | "30d" | "6mo" | "custom"
 
 export interface StormEvent {
   id: string

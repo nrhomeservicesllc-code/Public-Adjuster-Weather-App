@@ -8,10 +8,16 @@ interface MapState {
   selectedEvent: StormEvent | null
   selectedAlert: NWSAlert | null
   mapRef: unknown | null
+  highlightedAlertId: string | null
+  highlightedEventId: string | null
+  searchedLocation: { lat: number; lng: number; name: string } | null
   setFilters: (f: Partial<MapFilters>) => void
   setSelectedEvent: (e: StormEvent | null) => void
   setSelectedAlert: (a: NWSAlert | null) => void
   setMapRef: (map: unknown) => void
+  setHighlightedAlertId: (id: string | null) => void
+  setHighlightedEventId: (id: string | null) => void
+  setSearchedLocation: (loc: { lat: number; lng: number; name: string } | null) => void
   flyTo: (lat: number, lng: number, zoom?: number) => void
   resetFilters: () => void
 }
@@ -29,6 +35,9 @@ export const useMapStore = create<MapState>((set, get) => ({
   selectedEvent: null,
   selectedAlert: null,
   mapRef: null,
+  highlightedAlertId: null,
+  highlightedEventId: null,
+  searchedLocation: null,
 
   setFilters: (f) =>
     set((s) => ({ filters: { ...s.filters, ...f } })),
@@ -36,6 +45,9 @@ export const useMapStore = create<MapState>((set, get) => ({
   setSelectedEvent: (e) => set({ selectedEvent: e, selectedAlert: null }),
   setSelectedAlert: (a) => set({ selectedAlert: a, selectedEvent: null }),
   setMapRef: (map) => set({ mapRef: map }),
+  setHighlightedAlertId: (id) => set({ highlightedAlertId: id }),
+  setHighlightedEventId: (id) => set({ highlightedEventId: id }),
+  setSearchedLocation: (loc) => set({ searchedLocation: loc }),
 
   flyTo: (lat, lng, zoom = 12) => {
     const map = get().mapRef as {

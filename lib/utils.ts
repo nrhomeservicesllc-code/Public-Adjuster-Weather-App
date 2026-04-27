@@ -31,6 +31,8 @@ export function getSinceDate(range: string, customStart?: Date): Date {
       return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     case "30d":
       return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    case "6mo":
+      return new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000)
     case "custom":
       return customStart ?? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     default:

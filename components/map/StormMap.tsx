@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect } from "react"
-import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet"
+import { MapContainer, TileLayer, ZoomControl, useMap, Circle, CircleMarker, Tooltip } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import L from "leaflet"
 import { StormEventLayer } from "./StormEventLayer"
 import { AlertLayer } from "./AlertLayer"
 import { MapLegend } from "./MapLegend"
+import { MapSearchOverlay } from "./MapSearchOverlay"
 import { useMapStore } from "@/store/mapStore"
 
 delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl
@@ -29,12 +30,14 @@ function MapRefCapture() {
 }
 
 /**
- * Reads ?lat, ?lng, ?zoom from the current URL and flies the map there.
+ * Reads ?lat/?lng/?zoom/?aid/?eid from URL and flies the map + sets highlight IDs.
  * Uses window.location.search directly to avoid the Suspense requirement
  * that useSearchParams() imposes in Next.js 15 App Router.
  */
 function MapUrlNavigator() {
   const map = useMap()
+  const setHighlightedAlertId = useMapStore((s) => s.setHighlightedAlertId)
+  const setHighlightedEventId = useMapStore((s) => s.setHighlightedEventId)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -42,6 +45,11 @@ function MapUrlNavigator() {
     const lat = parseFloat(params.get("lat") ?? "")
     const lng = parseFloat(params.get("lng") ?? "")
     const zoom = parseInt(params.get("zoom") ?? "12", 10)
+    const aid = params.get("aid")
+    const eid = params.get("eid")
+
+    if (aid) setHighlightedAlertId(aid)
+    if (eid) setHighlightedEventId(eid)
 
     if (
       !isNaN(lat) && !isNaN(lng) &&
@@ -49,14 +57,53 @@ function MapUrlNavigator() {
       lng >= -180 && lng <= 180
     ) {
       const safeZoom = Math.min(Math.max(isNaN(zoom) ? 12 : zoom, 4), 18)
-      // Small timeout lets the map finish its initial render before flying
       setTimeout(() => {
-        map.flyTo([lat, lng], safeZoom, { animate: true, duration: 1.0 })
+        map.flyTo([lat, lng], safeZoom, { animate: true, duration: 1.2 })
       }, 300)
     }
-  }, [map])
+  }, [map, setHighlightedAlertId, setHighlightedEventId])
 
   return null
+}
+
+/** Pulsing pin shown after a map search — auto-clears after 12 s */
+function SearchLocationLayer() {
+  const searchedLocation = useMapStore((s) => s.searchedLocation)
+  const setSearchedLocation = useMapStore((s) => s.setSearchedLocation)
+
+  useEffect(() => {
+    if (!searchedLocation) return
+    const t = setTimeout(() => setSearchedLocation(null), 12000)
+    return () => clearTimeout(t)
+  }, [searchedLocation, setSearchedLocation])
+
+  if (!searchedLocation) return null
+
+  return (
+    <>
+      <Circle
+        center={[searchedLocation.lat, searchedLocation.lng]}
+        radius={6000}
+        pathOptions={{
+          color: "#2563EB",
+          fillColor: "#3B82F6",
+          fillOpacity: 0.08,
+          weight: 2,
+          dashArray: "6 4",
+          interactive: false,
+        } as object}
+      />
+      <CircleMarker
+        center={[searchedLocation.lat, searchedLocation.lng]}
+        radius={9}
+        pathOptions={{ color: "#1D4ED8", fillColor: "#3B82F6", fillOpacity: 1, weight: 3 }}
+      >
+        <Tooltip permanent direction="top" offset={[0, -13]}>
+          <span className="font-semibold">📍 {searchedLocation.name}</span>
+        </Tooltip>
+      </CircleMarker>
+    </>
+  )
 }
 
 export function StormMap() {
@@ -79,9 +126,13 @@ export function StormMap() {
         <ZoomControl position="bottomright" />
         <MapRefCapture />
         <MapUrlNavigator />
+        <SearchLocationLayer />
         <AlertLayer />
         <StormEventLayer />
       </MapContainer>
+
+      {/* Floating search — z-[1500] sits above all Leaflet panes */}
+      <MapSearchOverlay />
       <MapLegend />
     </div>
   )

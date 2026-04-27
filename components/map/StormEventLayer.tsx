@@ -1,6 +1,7 @@
 "use client"
 
-import { Circle, CircleMarker, Tooltip } from "react-leaflet"
+import React, { useEffect } from "react"
+import { Circle, CircleMarker, Tooltip, useMap } from "react-leaflet"
 import { useStormEvents } from "@/hooks/useStormEvents"
 import { useMapStore } from "@/store/mapStore"
 import { getStormColor } from "@/lib/stormColors"
@@ -36,9 +37,26 @@ function getImpactRadius(event: StormEvent): number {
   return Math.min(radius, 80000)
 }
 
+/** True if event occurred within the last 24 hours */
+function isToday(event: StormEvent): boolean {
+  return Date.now() - new Date(event.startTime).getTime() < 24 * 60 * 60 * 1000
+}
+
 export function StormEventLayer() {
+  const map = useMap()
   const { data: events = [], isLoading } = useStormEvents()
   const showStormEvents = useMapStore((s) => s.filters.showStormEvents)
+  const highlightedEventId = useMapStore((s) => s.highlightedEventId)
+
+  // Auto-fly to highlighted event when arriving from news page
+  useEffect(() => {
+    if (!highlightedEventId || events.length === 0) return
+    const ev = events.find((e) => e.id === highlightedEventId)
+    if (!ev || ev.latitude == null || ev.longitude == null) return
+    setTimeout(() => {
+      map.flyTo([ev.latitude!, ev.longitude!], 12, { animate: true, duration: 1.5 })
+    }, 400)
+  }, [highlightedEventId, events, map])
 
   if (!showStormEvents || isLoading) return null
 
@@ -53,24 +71,44 @@ export function StormEventLayer() {
         const color = getStormColor(event.eventType)
         const radius = getMarkerRadius(event)
         const impactRadius = getImpactRadius(event)
+        const isHighlighted = event.id === highlightedEventId
+        const todayEvent = isToday(event)
 
-        // How many same-type events in same county (for popup context)
         const nearbyCount = validEvents.filter(
           (e) => e.county && e.county === event.county && e.eventType === event.eventType
         ).length
 
+        // Impact radius fill: more visible for highlighted/today events
+        const fillOpacity = isHighlighted ? 0.35 : todayEvent ? 0.18 : 0.1
+
         return (
           <React.Fragment key={event.id}>
-            {/* Impact area — non-interactive so clicks pass through to the marker */}
+            {/* Outer highlight ring for highlighted events */}
+            {isHighlighted && (
+              <Circle
+                center={[event.latitude, event.longitude]}
+                radius={impactRadius * 1.15}
+                pathOptions={{
+                  color: color.stroke,
+                  fillColor: color.fill,
+                  fillOpacity: 0.08,
+                  weight: 2,
+                  dashArray: "8 4",
+                  interactive: false,
+                } as object}
+              />
+            )}
+
+            {/* Impact area — color-coded transparent radius matching the legend */}
             <Circle
               center={[event.latitude, event.longitude]}
               radius={impactRadius}
               pathOptions={{
                 color: color.stroke,
                 fillColor: color.fill,
-                fillOpacity: 0.07,
-                weight: 1,
-                dashArray: "5 5",
+                fillOpacity,
+                weight: isHighlighted ? 2 : 1,
+                dashArray: isHighlighted ? undefined : "5 5",
                 interactive: false,
               } as object}
             />
@@ -78,15 +116,15 @@ export function StormEventLayer() {
             {/* Precise location marker */}
             <CircleMarker
               center={[event.latitude, event.longitude]}
-              radius={radius}
+              radius={isHighlighted ? radius + 4 : radius}
               pathOptions={{
-                color: color.stroke,
+                color: isHighlighted ? "#ffffff" : color.stroke,
                 fillColor: color.fill,
-                fillOpacity: 0.85,
-                weight: 2,
+                fillOpacity: 0.95,
+                weight: isHighlighted ? 3 : 2,
               }}
             >
-              <Tooltip direction="top" offset={[0, -radius]} sticky>
+              <Tooltip direction="top" offset={[0, -(isHighlighted ? radius + 4 : radius)]} sticky>
                 <div className="text-xs">
                   <span className="font-bold">{color.label}</span>
                   {" · "}
@@ -94,6 +132,7 @@ export function StormEventLayer() {
                   {event.severity !== "LOW" && (
                     <span className="ml-1 opacity-70">({event.severity})</span>
                   )}
+                  {todayEvent && <span className="ml-1 font-bold text-red-600">● TODAY</span>}
                 </div>
               </Tooltip>
               <StormPopup event={event} nearbyCount={nearbyCount} />
@@ -104,6 +143,3 @@ export function StormEventLayer() {
     </>
   )
 }
-
-// React needs to be in scope for JSX Fragments
-import React from "react"

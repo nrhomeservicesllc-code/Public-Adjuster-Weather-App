@@ -14,6 +14,7 @@ const DATE_RANGES: { label: string; value: DateRange }[] = [
   { label: "3 days",  value: "3d"  },
   { label: "7 days",  value: "7d"  },
   { label: "30 days", value: "30d" },
+  { label: "6 months", value: "6mo" },
 ]
 
 const SEVERITIES: { label: string; value: Severity; color: string }[] = [
@@ -42,7 +43,7 @@ function FilterContent({ onClose }: { onClose: () => void }) {
       {/* Date Range */}
       <div>
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Date Range</p>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           {DATE_RANGES.map(({ label, value }) => (
             <button
               key={value}

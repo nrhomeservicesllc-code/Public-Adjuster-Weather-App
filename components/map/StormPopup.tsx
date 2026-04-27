@@ -27,7 +27,7 @@ function copyToClipboard(text: string) {
 function buildSummary(event: StormEvent): string {
   const color = getStormColor(event.eventType)
   const lines = [
-    `Storm Impact Map — ${color.label} Event`,
+    `ClaimCast — ${color.label} Event`,
     `Location: ${event.locationName}${event.county ? `, ${event.county} County` : ""}`,
     `Date: ${formatDate(event.startTime, "long")}`,
     event.windSpeedMph ? `Wind Speed: ${event.windSpeedMph} mph` : null,
