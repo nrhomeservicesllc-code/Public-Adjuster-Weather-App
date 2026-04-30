@@ -8,19 +8,15 @@ import { formatDate } from "@/lib/utils"
 
 // ─── Map geometry ─────────────────────────────────────────────────────────────
 
-const IMG_W = 640
-const IMG_H = 280
 const PAGE_PAD = 36
 // LETTER = 612pt wide; content width after left+right margins
 const PDF_MAP_W = 612 - PAGE_PAD * 2   // 540
-const PDF_MAP_H = Math.round(IMG_H * PDF_MAP_W / IMG_W)  // 236
+const PDF_MAP_H = Math.round(280 * PDF_MAP_W / 640)  // 236
 
-/** Radius of the SVG impact circle in PDF points */
-function circleRadiusPt(lat: number, radiusM: number, zoom: number): number {
-  const mpp = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom)
-  const radiusPx = radiusM / mpp
-  return Math.max(18, Math.min(radiusPx * (PDF_MAP_W / IMG_W), PDF_MAP_W * 0.44))
-}
+// The bbox in the route uses padding=1.5, so the circle always spans
+// 1/padding = 1/1.5 of each half-dimension.  Circle radius in PDF points:
+const CIRCLE_PADDING = 1.5
+const CIRCLE_R = Math.round(PDF_MAP_H / (2 * CIRCLE_PADDING))  // ~79 pt
 
 // ─── Storm helpers ────────────────────────────────────────────────────────────
 
@@ -200,12 +196,10 @@ function ProspectingLetter({ data }: { data: ReportData }) {
   const source = data.stormEvents[0]?.source ?? data.alerts[0]?.nwsId ? "NWS" : "NOAA"
   const verificationLabel = source.startsWith("NWS") ? "NWS-Verified" : "NOAA-Verified"
 
-  // Map overlay circle
-  const lat     = data.lat ?? 27.9944
-  const zoom    = data.mapZoom ?? 12
-  const rPt     = circleRadiusPt(lat, radiusM, zoom)
-  const cX      = PDF_MAP_W / 2
-  const cY      = PDF_MAP_H / 2
+  // Map overlay — circle radius is always proportional to the bbox extent
+  const rPt = CIRCLE_R   // ~79 pt (matches the 1.5× padding used when fetching the bbox)
+  const cX  = PDF_MAP_W / 2
+  const cY  = PDF_MAP_H / 2
 
   const stormLabel = { TORNADO: "Tornado", HURRICANE: "Hurricane", TROPICAL_STORM: "Tropical Storm", HAIL: "Hailstorm", WIND: "High Winds", FLOOD: "Flooding", RAIN: "Heavy Rain", THUNDERSTORM: "Severe Thunderstorm" }[stormType] ?? stormType
 
