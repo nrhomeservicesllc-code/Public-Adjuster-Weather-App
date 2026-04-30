@@ -66,8 +66,22 @@ function estimateRadiusMiles(
   return Math.round(Math.min(r, 50) * 10) / 10
 }
 
-/** Get alert center coords from rawGeometry or areaDesc fallback */
-function getAlertCenter(alert: NWSAlert): { lat: number; lng: number } | null {
+/** Resolve a text string to FL coordinates by trying word-by-word if full string fails */
+function resolveText(text: string): { lat: number; lng: number } | null {
+  const clean = text.replace(/ county$/i, "").trim()
+  let hits = searchFLLocations(clean, 1)
+  if (hits.length > 0) return { lat: hits[0].latitude, lng: hits[0].longitude }
+  // Try each word (longer first) — catches "6 SSW MIAMI" → "MIAMI"
+  const words = clean.split(/[\s,]+/).filter((w) => w.length > 3)
+  for (const word of [...words].reverse()) {
+    hits = searchFLLocations(word, 1)
+    if (hits.length > 0) return { lat: hits[0].latitude, lng: hits[0].longitude }
+  }
+  return null
+}
+
+/** Get alert center coords from rawGeometry, areaDesc, or FL centre fallback */
+function getAlertCenter(alert: NWSAlert): { lat: number; lng: number } {
   const g = alert.rawGeometry
   if (g) {
     try {
@@ -92,19 +106,13 @@ function getAlertCenter(alert: NWSAlert): { lat: number; lng: number } | null {
     } catch { /* fall through */ }
   }
 
-  // No geometry — parse areaDesc to find a matching FL location
   if (alert.areaDesc) {
-    const areas = alert.areaDesc.split(";").map((s) => s.trim())
-    for (const area of areas) {
-      // Strip " County" suffix and search
-      const term = area.replace(/ county$/i, "").trim()
-      const matches = searchFLLocations(term, 1)
-      if (matches.length > 0) {
-        return { lat: matches[0].latitude, lng: matches[0].longitude }
-      }
+    for (const area of alert.areaDesc.split(";").map((s) => s.trim())) {
+      const result = resolveText(area)
+      if (result) return result
     }
   }
-  return null
+  return { lat: 27.9944, lng: -81.7603 } // FL centre fallback
 }
 
 // ─── Event Card ────────────────────────────────────────────────────────────────
@@ -117,14 +125,11 @@ function EventCard({ event }: { event: StormEvent }) {
     event.windSpeedMph, event.hailSizeInches, event.rainfallInches, event.tornadoEF,
   )
 
-  // Use direct coords if available, otherwise resolve from locationName
+  // Use direct coords if available, otherwise resolve from locationName with word fallback
   const coords = (event.latitude != null && event.longitude != null)
     ? { lat: event.latitude, lng: event.longitude }
-    : (() => {
-        const hits = searchFLLocations(event.locationName, 1)
-        return hits.length > 0 ? { lat: hits[0].latitude, lng: hits[0].longitude } : null
-      })()
-  const hasCoords = coords !== null
+    : (resolveText(event.locationName) ?? { lat: 27.9944, lng: -81.7603 })
+  const hasCoords = true
 
   const goToMap = () => {
     if (coords) {
@@ -306,7 +311,7 @@ function AlertCard({ alert }: { alert: NWSAlert }) {
   const color = getStormColor(alert.eventType)
 
   const center = getAlertCenter(alert)
-  const canNavigate = center !== null
+  const canNavigate = true
 
   // Estimate radius based on event type + severity (no metrics available for raw alerts)
   const radius = estimateRadiusMiles(alert.eventType, alert.severity)

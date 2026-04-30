@@ -1,24 +1,89 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { generateReportPDF } from "@/lib/pdf/generateReport"
+import { searchFLLocations } from "@/lib/florida-locations"
+
+function extractCenter(geoJson: unknown): [number, number] | null {
+  try {
+    const geo = geoJson as { type: string; coordinates: unknown }
+    if (geo?.type === "Point") {
+      const [lng, lat] = geo.coordinates as number[]
+      if (!isNaN(lat) && !isNaN(lng)) return [lat, lng]
+    }
+    if (geo?.type === "Polygon") {
+      const ring = (geo.coordinates as number[][][])[0]
+      const lat = ring.reduce((s, c) => s + c[1], 0) / ring.length
+      const lng = ring.reduce((s, c) => s + c[0], 0) / ring.length
+      if (!isNaN(lat) && !isNaN(lng)) return [lat, lng]
+    }
+  } catch { /* fall through */ }
+  return null
+}
+
+function computeZoom(lat: number, radiusM: number): number {
+  const targetPx = 112
+  const idealMPP = radiusM / targetPx
+  const zoom = Math.log2((156543.03392 * Math.cos((lat * Math.PI) / 180)) / idealMPP)
+  return Math.max(7, Math.min(14, Math.round(zoom)))
+}
+
+async function fetchMapBase64(lat: number, lng: number, zoom: number): Promise<string | null> {
+  const url = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=${zoom}&size=640x280&maptype=mapnik`
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+    if (!res.ok) return null
+    const buf = await res.arrayBuffer()
+    return `data:image/png;base64,${Buffer.from(buf).toString("base64")}`
+  } catch {
+    return null
+  }
+}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return Response.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
-  const report = await prisma.report.findFirst({
-    where: { id, userId: session.user.id },
-  })
+  const [report, user] = await Promise.all([
+    prisma.report.findFirst({ where: { id, userId: session.user.id } }),
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true, email: true } }),
+  ])
   if (!report) return Response.json({ error: "Not found" }, { status: 404 })
 
-  const events = await prisma.stormEvent.findMany({
-    where: { id: { in: report.stormEventIds } },
-  })
+  const [events, alerts] = await Promise.all([
+    prisma.stormEvent.findMany({ where: { id: { in: report.stormEventIds } } }),
+    prisma.alert.findMany({ where: { id: { in: report.alertIds } } }),
+  ])
 
-  const alerts = await prisma.alert.findMany({
-    where: { id: { in: report.alertIds } },
-  })
+  // Resolve center coordinates
+  let center: [number, number] | null = extractCenter(report.geoJson)
+  if (!center) {
+    const ev = events.find((e) => e.latitude != null && e.longitude != null)
+    if (ev) center = [ev.latitude!, ev.longitude!]
+  }
+  if (!center) {
+    const hits = searchFLLocations(report.areaName.split(/[—–]/)[0].trim(), 1)
+    if (hits.length > 0) center = [hits[0].latitude, hits[0].longitude]
+  }
+  if (!center) center = [27.9944, -81.7603] // FL centre
+
+  const [lat, lng] = center
+  const areaName = report.areaName
+
+  // Derive storm type for radius calculation
+  const stormLabel = (areaName.split(/[—–-]/)[0] ?? "").trim().toLowerCase()
+  let stormType = "THUNDERSTORM"
+  if (stormLabel.includes("tornado")) stormType = "TORNADO"
+  else if (stormLabel.includes("hurricane")) stormType = "HURRICANE"
+  else if (stormLabel.includes("tropical")) stormType = "TROPICAL_STORM"
+  else if (stormLabel.includes("hail")) stormType = "HAIL"
+  else if (stormLabel.includes("wind")) stormType = "WIND"
+  else if (stormLabel.includes("flood")) stormType = "FLOOD"
+  else if (stormLabel.includes("rain")) stormType = "RAIN"
+
+  const radiusM = { TORNADO: 3000, HURRICANE: 40000, TROPICAL_STORM: 22000, HAIL: 5000, WIND: 5000, FLOOD: 7000, RAIN: 5000, THUNDERSTORM: 5000 }[stormType] ?? 5000
+  const zoom = computeZoom(lat, radiusM)
+  const mapBase64 = await fetchMapBase64(lat, lng, zoom)
 
   const pdfBuffer = await generateReportPDF({
     id: report.id,
@@ -52,6 +117,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     affectedLocations: [...new Set(events.map((e) => e.locationName))],
     summary: report.summary ?? `Storm exposure report for ${report.areaName}.`,
     dateRangeLabel: "Selected date range",
+    lat,
+    lng,
+    mapBase64,
+    mapZoom: zoom,
+    userName: user?.name ?? null,
+    userEmail: user?.email ?? null,
   })
 
   return new Response(pdfBuffer as unknown as BodyInit, {

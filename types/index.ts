@@ -130,6 +130,12 @@ export interface ReportData {
   affectedLocations: string[]
   summary: string
   dateRangeLabel: string
+  lat?: number | null
+  lng?: number | null
+  mapBase64?: string | null
+  mapZoom?: number | null
+  userName?: string | null
+  userEmail?: string | null
 }
 
 export interface MapFilters {
