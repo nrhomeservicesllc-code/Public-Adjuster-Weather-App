@@ -10,11 +10,11 @@
     },
     {
       "path": "/api/cron/archive-alerts",
-      "schedule": "0 * * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/notify-saved-areas",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 8 * * *"
     }
   ]
 }
