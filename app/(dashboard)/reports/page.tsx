@@ -76,7 +76,7 @@ const SEV_STYLE: Record<string, string> = {
  * Falls back to resolving from areaName via FL locations index so the
  * mini map always renders even when the stored coordinates are null.
  */
-function getCenter(geoJson: unknown, areaName: string): [number, number] | null {
+function getCenter(geoJson: unknown, areaName: string): [number, number] {
   // 1. Try direct geoJson coordinates
   try {
     const geo = geoJson as { type: string; coordinates: number[] | number[][][] }
