@@ -1,20 +1,20 @@
 import React from "react"
 import {
-  renderToBuffer, Document, Page, Text, View, StyleSheet, Image,
-  Svg, Circle,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  renderToBuffer, Document, Page, Text, View, StyleSheet, Canvas as CanvasComponent,
 } from "@react-pdf/renderer"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Canvas = CanvasComponent as any
 import type { ReportData } from "@/types"
 import { formatDate } from "@/lib/utils"
 
 // ─── Map geometry ─────────────────────────────────────────────────────────────
 
 const PAGE_PAD = 36
-// LETTER = 612pt wide; content width after left+right margins
-const PDF_MAP_W = 612 - PAGE_PAD * 2   // 540
-const PDF_MAP_H = Math.round(280 * PDF_MAP_W / 640)  // 236
+const PDF_MAP_W = 612 - PAGE_PAD * 2   // 540 pt
+const PDF_MAP_H = 236                   // fixed map height
 
-// The bbox in the route uses padding=1.5, so the circle always spans
-// 1/padding = 1/1.5 of each half-dimension.  Circle radius in PDF points:
+// Circle fills ~55 % of map height — same padding used in route bbox fetch
 const CIRCLE_PADDING = 1.5
 const CIRCLE_R = Math.round(PDF_MAP_H / (2 * CIRCLE_PADDING))  // ~79 pt
 
@@ -84,7 +84,7 @@ const STORM_SUBHEADS: Record<string, string> = {
   THUNDERSTORM: "YOUR ROOF MAY BE DAMAGED — SEVERE STORMS CAUSE DAMAGE BEYOND THE VISIBLE PATH.",
 }
 
-function getBody(stormType: string, stormLabel: string): { p1: string; p2: string } {
+function getBody(stormType: string): { p1: string; p2: string } {
   const bodies: Record<string, { p1: string; p2: string }> = {
     TORNADO: {
       p1: `Your home does not need to be in the direct path of a tornado to have a damaged roof. Tornadoes bring violent weather systems — high winds, driving rain, and severe atmospheric conditions — that extend for miles beyond the visible path. Lifted shingles, cracked tiles, damaged flashing, and broken seals are common in surrounding areas and completely invisible from the ground. If you are within miles of this storm, your roof needs to be inspected.`,
@@ -132,37 +132,22 @@ const BULLETS = [
 
 const S = StyleSheet.create({
   page:         { padding: PAGE_PAD, fontFamily: "Helvetica", fontSize: 10, color: "#1a1a1a", backgroundColor: "#ffffff" },
-  // Header
   headerBox:    { alignItems: "center", marginBottom: 8 },
   companyName:  { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#111827", letterSpacing: 1, textAlign: "center" },
   contactLine:  { fontSize: 9, color: "#4b5563", marginTop: 4, textAlign: "center" },
   dividerGreen: { height: 2, backgroundColor: "#15803d", marginVertical: 10 },
-  // Headline
   headline:     { fontSize: 15, fontFamily: "Helvetica-Bold", color: "#111827", textAlign: "center", marginBottom: 6, lineHeight: 1.3 },
-  subhead:      { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#b91c1c", textAlign: "center", marginBottom: 12, lineHeight: 1.3 },
-  // Map
-  mapContainer: { position: "relative", width: PDF_MAP_W, height: PDF_MAP_H, marginBottom: 6, overflow: "hidden", borderRadius: 4 },
-  mapPlaceholder: { width: PDF_MAP_W, height: PDF_MAP_H, backgroundColor: "#e2e8f0", alignItems: "center", justifyContent: "center", borderRadius: 4 },
-  mapCaption:   { fontSize: 8, color: "#4b5563", textAlign: "center", marginBottom: 12 },
-  // Info card overlay
-  infoCard:     { position: "absolute", top: 10, left: 10, backgroundColor: "rgba(0,0,0,0.72)", borderRadius: 5, padding: "7 10" },
-  infoDate:     { color: "#ffffff", fontSize: 9, fontFamily: "Helvetica-Bold" },
-  infoStorm:    { color: "#fb923c", fontSize: 9, fontFamily: "Helvetica-Bold", marginTop: 3 },
-  infoHomes:    { color: "#cbd5e1", fontSize: 8, marginTop: 2 },
-  infoSource:   { color: "#94a3b8", fontSize: 7, marginTop: 2 },
-  // Letter body
+  subhead:      { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#b91c1c", textAlign: "center", marginBottom: 10, lineHeight: 1.3 },
+  mapCaption:   { fontSize: 8, color: "#4b5563", textAlign: "center", marginTop: 6, marginBottom: 12 },
   salutation:   { fontSize: 10, fontFamily: "Helvetica-Bold", marginBottom: 8, color: "#111827" },
   bodyText:     { fontSize: 10, lineHeight: 1.65, color: "#374151", marginBottom: 10 },
   bullet:       { flexDirection: "row", marginBottom: 5, paddingLeft: 4 },
   bulletDot:    { fontSize: 10, color: "#374151", marginRight: 8, width: 10 },
   bulletText:   { fontSize: 10, lineHeight: 1.5, color: "#374151", flex: 1 },
-  // CTA
   ctaBox:       { backgroundColor: "#15803d", borderRadius: 6, padding: "10 14", marginVertical: 14, alignItems: "center" },
   ctaText:      { color: "#ffffff", fontSize: 12, fontFamily: "Helvetica-Bold", textAlign: "center" },
-  // Signature
   sigName:      { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#111827", marginTop: 4 },
   sigLine:      { fontSize: 9, color: "#4b5563" },
-  // Disclaimer
   disclaimer:   { marginTop: 14, paddingTop: 8, borderTop: "1px solid #e5e7eb" },
   disclaimerTx: { fontSize: 7, color: "#9ca3af", lineHeight: 1.5 },
 })
@@ -170,19 +155,17 @@ const S = StyleSheet.create({
 // ─── Document ─────────────────────────────────────────────────────────────────
 
 function ProspectingLetter({ data }: { data: ReportData }) {
-  const stormType  = parseStormType(data.areaName)
-  const severity   = parseSeverity(data.summary, data.areaName)
-  const radiusM    = impactRadiusM(stormType, severity)
-  const homes      = estimateHomes(radiusM)
-  const radiusMi   = (radiusM / 1609.34).toFixed(1)
-  const body       = getBody(stormType, stormType)
-  const headline   = STORM_HEADLINES[stormType] ?? STORM_HEADLINES.THUNDERSTORM
-  const subhead    = STORM_SUBHEADS[stormType] ?? STORM_SUBHEADS.THUNDERSTORM
+  const stormType       = parseStormType(data.areaName)
+  const severity        = parseSeverity(data.summary, data.areaName)
+  const radiusM         = impactRadiusM(stormType, severity)
+  const homes           = estimateHomes(radiusM)
+  const radiusMi        = (radiusM / 1609.34).toFixed(1)
+  const body            = getBody(stormType)
+  const headline        = STORM_HEADLINES[stormType] ?? STORM_HEADLINES.THUNDERSTORM
+  const subhead         = STORM_SUBHEADS[stormType] ?? STORM_SUBHEADS.THUNDERSTORM
+  const contactName     = data.userName ?? "Your Inspector"
+  const contactDisplay  = data.userEmail ?? "Contact us today"
 
-  const contactName    = data.userName ?? "Your Inspector"
-  const contactDisplay = data.userEmail ?? "Contact us today"
-
-  // Date from first storm event or report generation date
   const eventDate = data.stormEvents[0]?.startTime
     ? formatDate(data.stormEvents[0].startTime, "long")
     : formatDate(data.generatedAt, "long")
@@ -192,79 +175,157 @@ function ProspectingLetter({ data }: { data: ReportData }) {
     return parts.length > 1 ? parts.slice(1).join("").trim() : data.affectedLocations[0] ?? data.areaName
   })()
 
-  // Verification label based on source
-  const source = data.stormEvents[0]?.source ?? data.alerts[0]?.nwsId ? "NWS" : "NOAA"
+  const source = data.stormEvents[0]?.source ?? ""
   const verificationLabel = source.startsWith("NWS") ? "NWS-Verified" : "NOAA-Verified"
 
-  // Map overlay — circle radius is always proportional to the bbox extent
-  const rPt = CIRCLE_R   // ~79 pt (matches the 1.5× padding used when fetching the bbox)
-  const cX  = PDF_MAP_W / 2
-  const cY  = PDF_MAP_H / 2
+  const stormLabel = {
+    TORNADO: "Tornado", HURRICANE: "Hurricane", TROPICAL_STORM: "Tropical Storm",
+    HAIL: "Hailstorm", WIND: "High Winds", FLOOD: "Flooding", RAIN: "Heavy Rain",
+    THUNDERSTORM: "Severe Thunderstorm",
+  }[stormType] ?? stormType
 
-  const stormLabel = { TORNADO: "Tornado", HURRICANE: "Hurricane", TROPICAL_STORM: "Tropical Storm", HAIL: "Hailstorm", WIND: "High Winds", FLOOD: "Flooding", RAIN: "Heavy Rain", THUNDERSTORM: "Severe Thunderstorm" }[stormType] ?? stormType
+  const cx = PDF_MAP_W / 2
+  const cy = PDF_MAP_H / 2
+  const R  = CIRCLE_R
+
+  // Canvas paint — draws the entire impact map using PDFKit drawing API
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const paintMap = (painter: any) => {
+    const w = PDF_MAP_W
+    const h = PDF_MAP_H
+
+    // ── Background ──────────────────────────────────────────────────────────
+    if (data.mapBase64) {
+      try {
+        const b64 = data.mapBase64.replace(/^data:[^;]+;base64,/, "")
+        painter.image(Buffer.from(b64, "base64"), 0, 0, { width: w, height: h })
+      } catch {
+        painter.rect(0, 0, w, h).fillColor("#1a2744").fill()
+        drawGrid(painter, w, h)
+      }
+    } else {
+      // Dark map-style background
+      painter.rect(0, 0, w, h).fillColor("#1a2744").fill()
+      drawGrid(painter, w, h)
+    }
+
+    // ── Outer faint reference ring ───────────────────────────────────────────
+    painter.save()
+    painter.circle(cx, cy, R * 1.65)
+    painter.strokeColor("#ef4444").strokeOpacity(0.18).lineWidth(0.75).stroke()
+    painter.restore()
+
+    // ── Impact zone fill ────────────────────────────────────────────────────
+    painter.save()
+    painter.circle(cx, cy, R)
+    painter.fillColor("#b91c1c").fillOpacity(0.28).fill()
+    painter.restore()
+
+    // ── Impact zone dashed border ────────────────────────────────────────────
+    painter.save()
+    painter.dash(8, { space: 4 })
+    painter.circle(cx, cy, R)
+    painter.strokeColor("#dc2626").strokeOpacity(1).lineWidth(2.5).stroke()
+    painter.undash()
+    painter.restore()
+
+    // ── Inner 50% ring ───────────────────────────────────────────────────────
+    painter.save()
+    painter.circle(cx, cy, R * 0.5)
+    painter.strokeColor("#ef4444").strokeOpacity(0.35).lineWidth(0.75).stroke()
+    painter.restore()
+
+    // ── Cross-hair lines ─────────────────────────────────────────────────────
+    painter.save()
+    painter.strokeColor("#dc2626").strokeOpacity(0.45).lineWidth(0.75)
+    painter.moveTo(cx - R, cy).lineTo(cx + R, cy).stroke()
+    painter.moveTo(cx, cy - R).lineTo(cx, cy + R).stroke()
+    painter.restore()
+
+    // ── Epicenter dot ────────────────────────────────────────────────────────
+    painter.save()
+    painter.circle(cx, cy, 6).fillColor("#dc2626").fillOpacity(1).fill()
+    painter.circle(cx, cy, 6).strokeColor("#ffffff").strokeOpacity(1).lineWidth(2).stroke()
+    painter.restore()
+
+    // ── Cardinal labels ──────────────────────────────────────────────────────
+    painter.save()
+    painter.fillColor("#ffffff").fillOpacity(0.65).font("Helvetica-Bold").fontSize(8)
+    painter.text("N", cx - 4, cy - R - 15, { lineBreak: false })
+    painter.text("S", cx - 4, cy + R + 4,  { lineBreak: false })
+    painter.text("W", cx - R - 18, cy - 5, { lineBreak: false })
+    painter.text("E", cx + R + 6,  cy - 5, { lineBreak: false })
+    painter.restore()
+
+    // ── Scale bar ────────────────────────────────────────────────────────────
+    painter.save()
+    painter.strokeColor("#94a3b8").strokeOpacity(0.8).lineWidth(1)
+    painter.moveTo(cx, h - 16).lineTo(cx + R, h - 16).stroke()
+    painter.moveTo(cx, h - 20).lineTo(cx, h - 12).stroke()
+    painter.moveTo(cx + R, h - 20).lineTo(cx + R, h - 12).stroke()
+    painter.fillColor("#94a3b8").fillOpacity(1).font("Helvetica").fontSize(6.5)
+    painter.text(`${radiusMi} mi radius`, cx + R / 2 - 14, h - 28, { lineBreak: false })
+    painter.restore()
+
+    // ── Coordinates ──────────────────────────────────────────────────────────
+    painter.save()
+    painter.fillColor("#64748b").fillOpacity(1).font("Helvetica").fontSize(6.5)
+    const lat = data.lat ?? 27.9944
+    const lng = data.lng ?? -81.7603
+    painter.text(`${lat.toFixed(4)}°N  ${Math.abs(lng).toFixed(4)}°W`, 8, h - 12, { lineBreak: false })
+    painter.restore()
+
+    // ── Info card (dark overlay top-left) ────────────────────────────────────
+    painter.save()
+    painter.roundedRect(8, 8, 166, 62, 5)
+    painter.fillColor("#000000").fillOpacity(0.72).fill()
+    painter.restore()
+
+    painter.save()
+    painter.fillOpacity(1)
+    painter.font("Helvetica-Bold").fontSize(8.5).fillColor("#ffffff")
+    painter.text(eventDate, 18, 18, { lineBreak: false })
+    painter.font("Helvetica-Bold").fontSize(8.5).fillColor("#fb923c")
+    painter.text(stormLabel, 18, 31, { lineBreak: false })
+    painter.font("Helvetica").fontSize(7.5).fillColor("#cbd5e1")
+    painter.text(`~${homes} Houses Impacted`, 18, 44, { lineBreak: false })
+    painter.font("Helvetica").fontSize(7).fillColor("#94a3b8")
+    painter.text(verificationLabel, 18, 55, { lineBreak: false })
+    painter.restore()
+  }
 
   return React.createElement(Document, { title: `Storm Alert — ${data.areaName}` },
     React.createElement(Page, { size: "LETTER", style: S.page },
 
-      // ── Header ──────────────────────────────────────────────────────────────
+      // Header
       React.createElement(View, { style: S.headerBox },
         React.createElement(Text, { style: S.companyName }, contactName.toUpperCase()),
         React.createElement(Text, { style: S.contactLine }, contactDisplay),
       ),
       React.createElement(View, { style: S.dividerGreen }),
 
-      // ── Headline ────────────────────────────────────────────────────────────
+      // Headline
       React.createElement(Text, { style: S.headline },
         `${headline} ON ${eventDate.toUpperCase()}.`
       ),
       React.createElement(Text, { style: S.subhead }, subhead),
 
-      // ── Map ─────────────────────────────────────────────────────────────────
-      data.mapBase64
-        ? React.createElement(View, { style: S.mapContainer },
-            // Base map image
-            React.createElement(Image, {
-              src: data.mapBase64,
-              style: { position: "absolute", top: 0, left: 0, width: PDF_MAP_W, height: PDF_MAP_H },
-            }),
-            // Impact circle overlay
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            React.createElement(Svg as any, {
-              style: { position: "absolute", top: 0, left: 0, width: PDF_MAP_W, height: PDF_MAP_H },
-              viewBox: `0 0 ${PDF_MAP_W} ${PDF_MAP_H}`,
-            },
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              React.createElement(Circle as any, {
-                cx: cX, cy: cY, r: rPt,
-                fill: "rgba(185,28,28,0.22)",
-                stroke: "rgba(185,28,28,0.9)",
-                strokeWidth: 2.5,
-                strokeDasharray: "8 4",
-              })
-            ),
-            // Info card (top-left overlay)
-            React.createElement(View, { style: S.infoCard },
-              React.createElement(Text, { style: S.infoDate }, eventDate),
-              React.createElement(Text, { style: S.infoStorm }, stormLabel),
-              React.createElement(Text, { style: S.infoHomes }, `~${homes} Homes Impacted`),
-              React.createElement(Text, { style: S.infoSource }, verificationLabel),
-            ),
-          )
-        : React.createElement(View, { style: S.mapPlaceholder },
-            React.createElement(Text, { style: { color: "#94a3b8", fontSize: 9 } }, "[Storm Impact Map]")
-          ),
+      // Impact map — drawn entirely via PDFKit Canvas (no external images needed)
+      React.createElement(Canvas, {
+        style: { width: PDF_MAP_W, height: PDF_MAP_H },
+        paint: paintMap,
+      }),
 
-      // ── Map caption ─────────────────────────────────────────────────────────
+      // Caption
       React.createElement(Text, { style: S.mapCaption },
         `${eventDate}  |  ${locationLabel}, FL  |  ${verificationLabel}  |  ~${homes} Homes in Impact Radius`
       ),
 
-      // ── Letter body ─────────────────────────────────────────────────────────
+      // Letter body
       React.createElement(Text, { style: S.salutation }, "Dear Homeowner,"),
       React.createElement(Text, { style: S.bodyText }, body.p1),
       React.createElement(Text, { style: S.bodyText }, body.p2),
 
-      // Bullets
       ...BULLETS.map((b) =>
         React.createElement(View, { key: b, style: S.bullet },
           React.createElement(Text, { style: S.bulletDot }, "•"),
@@ -272,17 +333,19 @@ function ProspectingLetter({ data }: { data: ReportData }) {
         )
       ),
 
-      // ── CTA ─────────────────────────────────────────────────────────────────
+      // CTA
       React.createElement(View, { style: S.ctaBox },
-        React.createElement(Text, { style: S.ctaText }, `Call or text ${contactName} today: ${contactDisplay}`)
+        React.createElement(Text, { style: S.ctaText },
+          `Call or text ${contactName} today: ${contactDisplay}`
+        )
       ),
 
-      // ── Signature ───────────────────────────────────────────────────────────
+      // Signature
       React.createElement(Text, { style: { fontSize: 10, color: "#374151", marginBottom: 2 } }, "Sincerely,"),
       React.createElement(Text, { style: S.sigName }, contactName),
       React.createElement(Text, { style: S.sigLine }, contactDisplay),
 
-      // ── Disclaimer ──────────────────────────────────────────────────────────
+      // Disclaimer
       React.createElement(View, { style: S.disclaimer },
         React.createElement(Text, { style: S.disclaimerTx },
           "DISCLAIMER: This letter is based on publicly available weather data from the National Weather Service (NWS) and NOAA National Centers for Environmental Information (NCEI). Storm data reflects weather exposure only — it does not confirm property damage at any specific address. Homes-affected figures are estimates based on Florida average housing density. Always conduct a proper on-site inspection before making property damage claims. ClaimCast is not liable for any decisions made based on this information."
@@ -290,6 +353,16 @@ function ProspectingLetter({ data }: { data: ReportData }) {
       ),
     )
   )
+}
+
+// Subtle grid drawn on the dark background when no map image is available
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function drawGrid(painter: any, w: number, h: number) {
+  painter.save()
+  painter.strokeColor("#ffffff").strokeOpacity(0.07).lineWidth(0.4)
+  for (let x = 0; x <= w; x += 45) { painter.moveTo(x, 0).lineTo(x, h).stroke() }
+  for (let y = 0; y <= h; y += 45) { painter.moveTo(0, y).lineTo(w, y).stroke() }
+  painter.restore()
 }
 
 // ─── Export ───────────────────────────────────────────────────────────────────
