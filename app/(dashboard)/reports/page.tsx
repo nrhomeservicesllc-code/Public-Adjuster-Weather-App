@@ -113,7 +113,8 @@ function getCenter(geoJson: unknown, areaName: string): [number, number] | null 
     if (hits.length > 0) return [hits[0].latitude, hits[0].longitude]
   }
 
-  return null
+  // Ultimate fallback: centre of Florida so the map always renders
+  return [27.9944, -81.7603]
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -211,17 +212,15 @@ export default function ReportsPage() {
                 className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
               >
                 <div className="flex flex-col md:flex-row">
-                  {/* Mini Map */}
-                  {center && (
-                    <div className="md:w-64 h-48 md:h-auto flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-100">
-                      <ReportMiniMap
-                        lat={center[0]}
-                        lng={center[1]}
-                        stormType={stormType}
-                        radiusM={radiusM}
-                      />
-                    </div>
-                  )}
+                  {/* Mini Map — always rendered; height fixed so Leaflet can measure it */}
+                  <div className="md:w-64 h-48 flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-100">
+                    <ReportMiniMap
+                      lat={center[0]}
+                      lng={center[1]}
+                      stormType={stormType}
+                      radiusM={radiusM}
+                    />
+                  </div>
 
                   {/* Details */}
                   <div className="flex-1 p-5 min-w-0">
