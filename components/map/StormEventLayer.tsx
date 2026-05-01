@@ -9,32 +9,36 @@ import { getMarkerRadius } from "@/lib/utils"
 import { StormPopup } from "./StormPopup"
 import type { StormEvent } from "@/types"
 
-/** Returns geographic impact radius in meters based on storm type + metrics */
+/**
+ * Returns display radius in meters. Bases are sized so circles are visible
+ * at Florida state zoom (zoom 7 = ~1080m/px) — minimum ~20px on screen.
+ * These reflect realistic "inspect-within" distances for public adjusters.
+ */
 function getImpactRadius(event: StormEvent): number {
   const base: Record<string, number> = {
-    TORNADO: 2500,
-    HURRICANE: 35000,
-    TROPICAL_STORM: 20000,
-    HAIL: 4000,
-    WIND: 4000,
-    FLOOD: 6000,
-    RAIN: 5000,
-    THUNDERSTORM: 5000,
+    TORNADO: 22000,
+    HURRICANE: 80000,
+    TROPICAL_STORM: 55000,
+    HAIL: 25000,
+    WIND: 30000,
+    FLOOD: 28000,
+    RAIN: 22000,
+    THUNDERSTORM: 22000,
   }
-  let radius = base[event.eventType] ?? 4000
+  let radius = base[event.eventType] ?? 22000
 
-  if (event.windSpeedMph && event.windSpeedMph > 40) radius += event.windSpeedMph * 60
-  if (event.hailSizeInches && event.hailSizeInches > 0.5) radius += event.hailSizeInches * 3000
-  if (event.rainfallInches && event.rainfallInches > 1) radius += event.rainfallInches * 1500
+  if (event.windSpeedMph && event.windSpeedMph > 40) radius += event.windSpeedMph * 150
+  if (event.hailSizeInches && event.hailSizeInches > 0.5) radius += event.hailSizeInches * 4000
+  if (event.rainfallInches && event.rainfallInches > 1) radius += event.rainfallInches * 2000
   if (event.tornadoEF) {
     const ef = parseInt(event.tornadoEF.replace(/\D/g, ""), 10)
-    if (!isNaN(ef)) radius += ef * 1200
+    if (!isNaN(ef)) radius += ef * 3000
   }
 
-  if (event.severity === "EXTREME") radius *= 1.8
-  else if (event.severity === "HIGH") radius *= 1.4
+  if (event.severity === "EXTREME") radius *= 1.5
+  else if (event.severity === "HIGH") radius *= 1.25
 
-  return Math.min(radius, 80000)
+  return Math.min(radius, 120000)
 }
 
 /** True if event occurred within the last 24 hours */
