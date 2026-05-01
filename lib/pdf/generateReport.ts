@@ -194,25 +194,25 @@ function ProspectingLetter({ data }: { data: ReportData }) {
     const w = PDF_MAP_W
     const h = PDF_MAP_H
 
-    // ── Background ──────────────────────────────────────────────────────────
-    if (data.mapBase64) {
-      try {
-        const b64 = data.mapBase64.replace(/^data:[^;]+;base64,/, "")
-        painter.image(Buffer.from(b64, "base64"), 0, 0, { width: w, height: h })
-      } catch {
-        painter.rect(0, 0, w, h).fillColor("#1a2744").fill()
-        drawGrid(painter, w, h)
-      }
-    } else {
-      // Dark map-style background
-      painter.rect(0, 0, w, h).fillColor("#1a2744").fill()
-      drawGrid(painter, w, h)
-    }
-
-    // ── Outer faint reference ring ───────────────────────────────────────────
+    // ── Background: clean dark radar style (no grid squares) ────────────────
     painter.save()
-    painter.circle(cx, cy, R * 1.65)
-    painter.strokeColor("#ef4444").strokeOpacity(0.18).lineWidth(0.75).stroke()
+    painter.rect(0, 0, w, h).fillColor("#0f172a").fill()
+    painter.restore()
+
+    // Subtle horizontal terrain bands for visual depth
+    painter.save()
+    painter.rect(0, h * 0.55, w, h * 0.45).fillColor("#1e293b").fillOpacity(0.5).fill()
+    painter.restore()
+    painter.save()
+    painter.rect(0, h * 0.78, w, h * 0.22).fillColor("#334155").fillOpacity(0.35).fill()
+    painter.restore()
+
+    // ── Concentric range rings (radar style) ─────────────────────────────────
+    painter.save()
+    painter.strokeColor("#64748b").strokeOpacity(0.22).lineWidth(0.5)
+    for (const mult of [0.4, 0.7, 1.0, 1.35, 1.7]) {
+      painter.circle(cx, cy, R * mult).stroke()
+    }
     painter.restore()
 
     // ── Impact zone fill ────────────────────────────────────────────────────
@@ -352,16 +352,6 @@ function ProspectingLetter({ data }: { data: ReportData }) {
       ),
     )
   )
-}
-
-// Subtle grid drawn on the dark background when no map image is available
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function drawGrid(painter: any, w: number, h: number) {
-  painter.save()
-  painter.strokeColor("#ffffff").strokeOpacity(0.07).lineWidth(0.4)
-  for (let x = 0; x <= w; x += 45) { painter.moveTo(x, 0).lineTo(x, h).stroke() }
-  for (let y = 0; y <= h; y += 45) { painter.moveTo(0, y).lineTo(w, y).stroke() }
-  painter.restore()
 }
 
 // ─── Export ───────────────────────────────────────────────────────────────────

@@ -20,25 +20,6 @@ function extractCenter(geoJson: unknown): [number, number] | null {
   return null
 }
 
-// Esri World Imagery (satellite) — free, no API key, reliable
-// bbox computed so the impact circle always fills ~66% of the image height
-async function fetchMapBase64(lat: number, lng: number, radiusM: number): Promise<string | null> {
-  const padding = 1.5
-  const latDelta = (padding * radiusM) / 111000
-  const lngDelta = latDelta * (640 / 280) / Math.cos((lat * Math.PI) / 180)
-  const bbox = `${lng - lngDelta},${lat - latDelta},${lng + lngDelta},${lat + latDelta}`
-  const url =
-    `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export` +
-    `?bbox=${bbox}&bboxSR=4326&size=640,280&format=png32&f=image`
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(12000) })
-    if (!res.ok) return null
-    const buf = await res.arrayBuffer()
-    return `data:image/png;base64,${Buffer.from(buf).toString("base64")}`
-  } catch {
-    return null
-  }
-}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -82,9 +63,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   else if (stormLabel.includes("flood")) stormType = "FLOOD"
   else if (stormLabel.includes("rain")) stormType = "RAIN"
 
-  const radiusM = { TORNADO: 3000, HURRICANE: 40000, TROPICAL_STORM: 22000, HAIL: 5000, WIND: 5000, FLOOD: 7000, RAIN: 5000, THUNDERSTORM: 5000 }[stormType] ?? 5000
-  const mapBase64 = await fetchMapBase64(lat, lng, radiusM)
-
   const pdfBuffer = await generateReportPDF({
     id: report.id,
     areaName: report.areaName,
@@ -119,7 +97,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     dateRangeLabel: "Selected date range",
     lat,
     lng,
-    mapBase64,
     userName: user?.name ?? null,
     userEmail: user?.email ?? null,
   })
