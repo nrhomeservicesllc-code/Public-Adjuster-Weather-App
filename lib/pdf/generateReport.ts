@@ -226,7 +226,6 @@ function ProspectingLetter({ data }: { data: ReportData }) {
     painter.dash(8, { space: 4 })
     painter.circle(cx, cy, R)
     painter.strokeColor("#dc2626").strokeOpacity(1).lineWidth(2.5).stroke()
-    painter.undash()
     painter.restore()
 
     // ── Inner 50% ring ───────────────────────────────────────────────────────
