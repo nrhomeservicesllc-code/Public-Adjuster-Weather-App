@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { MapContainer, TileLayer, ZoomControl, useMap, Circle, CircleMarker, Tooltip } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import L from "leaflet"
@@ -9,6 +9,7 @@ import { AlertLayer } from "./AlertLayer"
 import { MapLegend } from "./MapLegend"
 import { MapSearchOverlay } from "./MapSearchOverlay"
 import { useMapStore } from "@/store/mapStore"
+import { getStormColor } from "@/lib/stormColors"
 
 delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -106,6 +107,79 @@ function SearchLocationLayer() {
   )
 }
 
+/**
+ * When arriving from "View on Map" in Latest Reports, the URL carries
+ * ?stormType=TORNADO&radiusM=3000. This layer draws the impact circle
+ * directly from those params so it always shows — even for old events
+ * that aren't in the current 24h filter window.
+ */
+function ReportImpactLayer() {
+  const [impact, setImpact] = useState<{
+    lat: number; lng: number; radiusM: number; stormType: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const p = new URLSearchParams(window.location.search)
+    const lat      = parseFloat(p.get("lat") ?? "")
+    const lng      = parseFloat(p.get("lng") ?? "")
+    const radiusM  = parseInt(p.get("radiusM") ?? "", 10)
+    const stormType = p.get("stormType") ?? ""
+    if (!isNaN(lat) && !isNaN(lng) && radiusM > 0 && stormType) {
+      setImpact({ lat, lng, radiusM, stormType })
+    }
+  }, [])
+
+  if (!impact) return null
+
+  const color = getStormColor(impact.stormType)
+
+  return (
+    <>
+      {/* Outer glow ring */}
+      <Circle
+        center={[impact.lat, impact.lng]}
+        radius={impact.radiusM * 1.25}
+        pathOptions={{
+          color: color.stroke,
+          fillColor: color.fill,
+          fillOpacity: 0.07,
+          weight: 1,
+          dashArray: "6 5",
+          interactive: false,
+        } as object}
+      />
+      {/* Main impact zone */}
+      <Circle
+        center={[impact.lat, impact.lng]}
+        radius={impact.radiusM}
+        pathOptions={{
+          color: color.stroke,
+          fillColor: color.fill,
+          fillOpacity: 0.32,
+          weight: 3,
+          interactive: false,
+        } as object}
+      />
+      {/* Epicentre marker */}
+      <CircleMarker
+        center={[impact.lat, impact.lng]}
+        radius={10}
+        pathOptions={{
+          color: "#ffffff",
+          fillColor: color.fill,
+          fillOpacity: 1,
+          weight: 3,
+        }}
+      >
+        <Tooltip permanent direction="top" offset={[0, -14]}>
+          <span className="font-bold">{color.label} Impact Zone</span>
+        </Tooltip>
+      </CircleMarker>
+    </>
+  )
+}
+
 export function StormMap() {
   return (
     <div className="relative h-full w-full">
@@ -127,6 +201,7 @@ export function StormMap() {
         <MapRefCapture />
         <MapUrlNavigator />
         <SearchLocationLayer />
+        <ReportImpactLayer />
         <AlertLayer />
         <StormEventLayer />
       </MapContainer>

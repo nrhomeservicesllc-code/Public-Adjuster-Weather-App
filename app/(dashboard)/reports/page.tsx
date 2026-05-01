@@ -146,11 +146,16 @@ export default function ReportsPage() {
 
   const viewOnMap = (report: Report) => {
     const center = getCenter(report.geoJson, report.areaName)
-    if (!center) return
     const [lat, lng] = center
+    const stormType = parseStormType(report.areaName)
+    const severity   = parseSeverity(report.summary, report.areaName)
+    const radiusM    = impactRadiusM(stormType, severity)
     const eid = report.stormEventIds[0] ?? ""
     const aid = report.alertIds[0] ?? ""
-    const params = new URLSearchParams({ lat: String(lat), lng: String(lng), zoom: "12" })
+    const params = new URLSearchParams({
+      lat: String(lat), lng: String(lng), zoom: "11",
+      stormType, radiusM: String(Math.round(radiusM)),
+    })
     if (eid) params.set("eid", eid)
     else if (aid) params.set("aid", aid)
     router.push(`/map?${params}`)
