@@ -6,6 +6,7 @@ import "leaflet/dist/leaflet.css"
 import L from "leaflet"
 import { StormEventLayer } from "./StormEventLayer"
 import { AlertLayer } from "./AlertLayer"
+import { ReportLayer } from "./ReportLayer"
 import { MapLegend } from "./MapLegend"
 import { MapSearchOverlay } from "./MapSearchOverlay"
 import { useMapStore } from "@/store/mapStore"
@@ -204,6 +205,7 @@ export function StormMap() {
         <ReportImpactLayer />
         <AlertLayer />
         <StormEventLayer />
+        <ReportLayer />
       </MapContainer>
 
       {/* Floating search — z-[1500] sits above all Leaflet panes */}
