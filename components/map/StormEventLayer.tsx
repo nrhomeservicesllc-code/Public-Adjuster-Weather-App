@@ -78,28 +78,24 @@ export function StormEventLayer() {
           (e) => e.county && e.county === event.county && e.eventType === event.eventType
         ).length
 
-        // Impact radius fill: more visible for highlighted/today events
-        const fillOpacity = isHighlighted ? 0.35 : todayEvent ? 0.18 : 0.1
+        const fillOpacity = isHighlighted ? 0.55 : todayEvent ? 0.40 : 0.30
 
         return (
           <React.Fragment key={event.id}>
-            {/* Outer highlight ring for highlighted events */}
-            {isHighlighted && (
-              <Circle
-                center={[event.latitude, event.longitude]}
-                radius={impactRadius * 1.15}
-                pathOptions={{
-                  color: color.stroke,
-                  fillColor: color.fill,
-                  fillOpacity: 0.08,
-                  weight: 2,
-                  dashArray: "8 4",
-                  interactive: false,
-                } as object}
-              />
-            )}
+            {/* Outer glow ring */}
+            <Circle
+              center={[event.latitude, event.longitude]}
+              radius={impactRadius * 1.3}
+              pathOptions={{
+                color: color.stroke,
+                fillColor: color.fill,
+                fillOpacity: isHighlighted ? 0.12 : 0.08,
+                weight: 1,
+                interactive: false,
+              } as object}
+            />
 
-            {/* Impact area — color-coded transparent radius matching the legend */}
+            {/* Impact area */}
             <Circle
               center={[event.latitude, event.longitude]}
               radius={impactRadius}
@@ -107,8 +103,7 @@ export function StormEventLayer() {
                 color: color.stroke,
                 fillColor: color.fill,
                 fillOpacity,
-                weight: isHighlighted ? 2 : 1,
-                dashArray: isHighlighted ? undefined : "5 5",
+                weight: isHighlighted ? 3 : 2.5,
                 interactive: false,
               } as object}
             />
