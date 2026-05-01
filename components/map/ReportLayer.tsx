@@ -26,7 +26,8 @@ function impactRadiusM(stormType: string): number {
   return base[stormType] ?? 22000
 }
 
-function getCenter(geoJson: unknown, areaName: string): [number, number] | null {
+function getCenter(geoJson: unknown, areaName: string): [number, number] {
+  // 1. GeoJSON coordinates
   try {
     const geo = geoJson as { type: string; coordinates: unknown }
     if (geo?.type === "Point") {
@@ -41,13 +42,18 @@ function getCenter(geoJson: unknown, areaName: string): [number, number] | null 
     }
   } catch { /* fall through */ }
 
+  // 2. Text-based resolution — try the location part after the dash first
   const candidates: string[] = []
   const dashPart = areaName.split(/[—–]/).slice(1).join(" ").trim()
   if (dashPart) {
     dashPart.split(",").forEach((s) =>
       candidates.push(s.trim().replace(/\s+(co\.|county|fl|florida)\.?$/i, "").trim())
     )
+    // Word-by-word (handles "3 NNW Punta Gorda" → tries "Punta", "Gorda", etc.)
+    const words = dashPart.split(/[\s,]+/).filter((w) => w.length > 3 && !/^\d+$/.test(w) && !/^[A-Z]{1,3}$/.test(w))
+    words.reverse().forEach((w) => candidates.push(w))
   }
+  // Also try the full name before the dash
   candidates.push(areaName.split(/[—–]/)[0].trim())
 
   for (const term of candidates) {
@@ -56,7 +62,8 @@ function getCenter(geoJson: unknown, areaName: string): [number, number] | null 
     if (hits.length > 0) return [hits[0].latitude, hits[0].longitude]
   }
 
-  return null
+  // 3. Always render — fall back to Florida center so no report is ever hidden
+  return [27.9944, -81.7603]
 }
 
 function formatDate(iso: string) {
@@ -66,9 +73,10 @@ function formatDate(iso: string) {
 export function ReportLayer() {
   const { data: reports = [] } = useReports()
 
-  const positioned = reports
-    .map((r) => ({ report: r, center: getCenter(r.geoJson, r.areaName) }))
-    .filter((x): x is { report: Report; center: [number, number] } => x.center !== null)
+  const positioned = reports.map((r) => ({
+    report: r,
+    center: getCenter(r.geoJson, r.areaName),
+  }))
 
   return (
     <>

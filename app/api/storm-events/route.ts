@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { auth } from "@/lib/auth"
 import { getSinceDate } from "@/lib/utils"
 import { fetchFloridaAlerts } from "@/lib/api/nws"
 import { normalizeNWSEventType, NWS_SEVERITY_MAP } from "@/lib/stormColors"
@@ -41,6 +42,52 @@ function resolveAreaCoords(areaDesc: string): { lat: number; lng: number } | nul
   const areas = areaDesc.split(";").map((s) => s.trim()).filter(Boolean)
   for (const area of areas) {
     const term = area.replace(/ county$/i, "").trim()
+    const hits = searchFLLocations(term, 1)
+    if (hits.length > 0) return { lat: hits[0].latitude, lng: hits[0].longitude }
+  }
+  return null
+}
+
+function parseReportStormType(areaName: string): string {
+  const label = (areaName.split(/[—–-]/)[0] ?? "").trim().toLowerCase()
+  if (label.includes("tornado")) return "TORNADO"
+  if (label.includes("hurricane")) return "HURRICANE"
+  if (label.includes("tropical")) return "TROPICAL_STORM"
+  if (label.includes("hail")) return "HAIL"
+  if (label.includes("wind")) return "WIND"
+  if (label.includes("flood")) return "FLOOD"
+  if (label.includes("rain")) return "RAIN"
+  return "THUNDERSTORM"
+}
+
+function resolveReportCenter(geoJson: unknown, areaName: string): { lat: number; lng: number } | null {
+  try {
+    const geo = geoJson as { type: string; coordinates: unknown }
+    if (geo?.type === "Point") {
+      const [lng, lat] = geo.coordinates as number[]
+      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng }
+    }
+    if (geo?.type === "Polygon") {
+      const ring = (geo.coordinates as number[][][])[0]
+      const lng = ring.reduce((s, c) => s + c[0], 0) / ring.length
+      const lat = ring.reduce((s, c) => s + c[1], 0) / ring.length
+      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng }
+    }
+  } catch { /* fall through */ }
+
+  const dashPart = areaName.split(/[—–]/).slice(1).join(" ").trim()
+  const candidates: string[] = []
+  if (dashPart) {
+    dashPart.split(",").forEach((s) =>
+      candidates.push(s.trim().replace(/\s+(co\.|county|fl|florida)\.?$/i, "").trim())
+    )
+    const words = dashPart.split(/[\s,]+/).filter((w) => w.length > 3 && !/^\d+$/.test(w))
+    words.reverse().forEach((w) => candidates.push(w))
+  }
+  candidates.push(areaName.split(/[—–]/)[0].trim())
+
+  for (const term of candidates) {
+    if (term.length < 3) continue
     const hits = searchFLLocations(term, 1)
     if (hits.length > 0) return { lat: hits[0].latitude, lng: hits[0].longitude }
   }
@@ -158,6 +205,54 @@ export async function GET(req: Request) {
     console.error("Storm events NWS fetch failed:", nwsErr)
   }
 
-  // 3. Both unavailable
+  // 3. Last resort — synthesise pseudo-events from the user's own saved reports
+  //    so the map always shows their historical work even with no NOAA/NWS data.
+  try {
+    const session = await auth()
+    if (session?.user?.id) {
+      const reports = await prisma.report.findMany({
+        where: {
+          userId: session.user.id,
+          NOT: { areaName: { startsWith: "notify:" } },
+        },
+        orderBy: { generatedAt: "desc" },
+        take: 50,
+        select: { id: true, areaName: true, geoJson: true, generatedAt: true, summary: true },
+      })
+
+      const now = new Date().toISOString()
+      const pseudoEvents = reports.flatMap((r) => {
+        const center = resolveReportCenter(r.geoJson, r.areaName)
+        if (!center) return []
+        const stormType = parseReportStormType(r.areaName)
+        return [{
+          id: `report-${r.id}`,
+          externalId: null,
+          source: "REPORT",
+          sourceUrl: null,
+          eventType: stormType,
+          severity: "MODERATE",
+          confidenceLevel: "REPORTED",
+          locationName: r.areaName,
+          state: "FL",
+          county: null,
+          zipCode: null,
+          latitude: center.lat,
+          longitude: center.lng,
+          startTime: r.generatedAt,
+          endTime: null,
+          windSpeedMph: null,
+          hailSizeInches: null,
+          rainfallInches: null,
+          tornadoEF: null,
+          description: r.summary ?? null,
+          createdAt: now,
+        }]
+      })
+
+      if (pseudoEvents.length > 0) return Response.json(pseudoEvents)
+    }
+  } catch { /* fall through */ }
+
   return Response.json([])
 }
