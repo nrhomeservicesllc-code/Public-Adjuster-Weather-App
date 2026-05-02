@@ -20,18 +20,20 @@ export function MapLegend() {
       </button>
 
       {open && (
-        <div className="px-3 pb-3 space-y-1.5 min-w-[140px]">
+        <div className="px-3 pb-3 space-y-1.5 min-w-[150px]">
           {Object.entries(STORM_COLORS).map(([key, val]) => (
             <div key={key} className="flex items-center gap-2">
               <span
-                className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                className="inline-flex items-center justify-center w-6 h-6 rounded-full flex-shrink-0 text-sm shadow-sm border-2 border-white"
                 style={{ backgroundColor: val.fill }}
-              />
+              >
+                {val.emoji}
+              </span>
               <span className="text-xs text-slate-700">{val.label}</span>
             </div>
           ))}
           <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-            <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 border-2 border-dashed border-blue-600 bg-blue-100" />
+            <span className="inline-block w-6 h-4 rounded-sm flex-shrink-0 border-2 border-dashed border-blue-600 bg-blue-100" />
             <span className="text-xs text-slate-700">NWS Alert Zone</span>
           </div>
         </div>
