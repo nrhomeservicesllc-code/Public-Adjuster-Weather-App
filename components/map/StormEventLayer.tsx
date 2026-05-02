@@ -1,19 +1,35 @@
 "use client"
 
-import React, { useEffect } from "react"
-import { Circle, CircleMarker, Tooltip, useMap } from "react-leaflet"
+import React, { useEffect, useMemo } from "react"
+import { Polygon, Marker, Tooltip, useMap } from "react-leaflet"
+import L from "leaflet"
 import { useStormEvents } from "@/hooks/useStormEvents"
 import { useMapStore } from "@/store/mapStore"
 import { getStormColor } from "@/lib/stormColors"
-import { getMarkerRadius } from "@/lib/utils"
 import { StormPopup } from "./StormPopup"
 import type { StormEvent } from "@/types"
 
 /**
- * Returns display radius in meters. Bases are sized so circles are visible
- * at Florida state zoom (zoom 7 = ~1080m/px) — minimum ~20px on screen.
- * These reflect realistic "inspect-within" distances for public adjusters.
+ * Generates an organic blob polygon around a lat/lng point.
+ * Uses deterministic sine-wave perturbation so the shape is stable across renders.
  */
+function blobPolygon(lat: number, lng: number, radiusM: number): [number, number][] {
+  const N = 22
+  const latR = radiusM / 111000
+  const lngR = radiusM / (111000 * Math.cos((lat * Math.PI) / 180))
+  const seed = ((lat * 997 + lng * 431) % (2 * Math.PI)) + 1
+
+  return Array.from({ length: N }, (_, i) => {
+    const angle = (i / N) * 2 * Math.PI
+    const r =
+      1 +
+      0.13 * Math.sin(angle * 3 + seed) +
+      0.09 * Math.cos(angle * 5 + seed * 1.6) +
+      0.05 * Math.sin(angle * 7 + seed * 0.8)
+    return [lat + latR * r * Math.cos(angle), lng + lngR * r * Math.sin(angle)] as [number, number]
+  })
+}
+
 function getImpactRadius(event: StormEvent): number {
   const base: Record<string, number> = {
     TORNADO: 22000,
@@ -34,16 +50,33 @@ function getImpactRadius(event: StormEvent): number {
     const ef = parseInt(event.tornadoEF.replace(/\D/g, ""), 10)
     if (!isNaN(ef)) radius += ef * 3000
   }
-
   if (event.severity === "EXTREME") radius *= 1.5
   else if (event.severity === "HIGH") radius *= 1.25
 
   return Math.min(radius, 120000)
 }
 
-/** True if event occurred within the last 24 hours */
 function isToday(event: StormEvent): boolean {
   return Date.now() - new Date(event.startTime).getTime() < 24 * 60 * 60 * 1000
+}
+
+function makeIcon(emoji: string, color: string, size: number) {
+  return L.divIcon({
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:${color};
+      border:2.5px solid #fff;
+      border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:${Math.round(size * 0.52)}px;line-height:1;
+      box-shadow:0 2px 6px rgba(0,0,0,0.45);
+      ">${emoji}</div>`,
+    className: "",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    tooltipAnchor: [0, -(size / 2 + 4)],
+    popupAnchor: [0, -(size / 2 + 4)],
+  })
 }
 
 export function StormEventLayer() {
@@ -52,7 +85,6 @@ export function StormEventLayer() {
   const showStormEvents = useMapStore((s) => s.filters.showStormEvents)
   const highlightedEventId = useMapStore((s) => s.highlightedEventId)
 
-  // Auto-fly to highlighted event when arriving from news page
   useEffect(() => {
     if (!highlightedEventId || events.length === 0) return
     const ev = events.find((e) => e.id === highlightedEventId)
@@ -62,68 +94,67 @@ export function StormEventLayer() {
     }, 400)
   }, [highlightedEventId, events, map])
 
-  if (!showStormEvents || isLoading) return null
-
-  const validEvents = events.filter(
-    (e): e is StormEvent & { latitude: number; longitude: number } =>
-      e.latitude != null && e.longitude != null
+  const validEvents = useMemo(
+    () =>
+      events.filter(
+        (e): e is StormEvent & { latitude: number; longitude: number } =>
+          e.latitude != null && e.longitude != null
+      ),
+    [events]
   )
+
+  if (!showStormEvents || isLoading) return null
 
   return (
     <>
       {validEvents.map((event) => {
         const color = getStormColor(event.eventType)
-        const radius = getMarkerRadius(event)
         const impactRadius = getImpactRadius(event)
         const isHighlighted = event.id === highlightedEventId
         const todayEvent = isToday(event)
+        const fillOpacity = isHighlighted ? 0.60 : todayEvent ? 0.48 : 0.35
+
+        const outerBlob = blobPolygon(event.latitude, event.longitude, impactRadius * 1.3)
+        const innerBlob = blobPolygon(event.latitude, event.longitude, impactRadius)
 
         const nearbyCount = validEvents.filter(
           (e) => e.county && e.county === event.county && e.eventType === event.eventType
         ).length
 
-        const fillOpacity = isHighlighted ? 0.55 : todayEvent ? 0.40 : 0.30
+        const iconSize = isHighlighted ? 36 : todayEvent ? 30 : 26
+        const icon = makeIcon(color.emoji, color.fill, iconSize)
 
         return (
           <React.Fragment key={event.id}>
-            {/* Outer glow ring — always present */}
-            <Circle
-              center={[event.latitude, event.longitude]}
-              radius={impactRadius * 1.3}
+            {/* Outer glow zone */}
+            <Polygon
+              positions={outerBlob}
               pathOptions={{
                 color: color.stroke,
                 fillColor: color.fill,
-                fillOpacity: isHighlighted ? 0.12 : 0.08,
-                weight: 1,
+                fillOpacity: isHighlighted ? 0.14 : 0.08,
+                weight: 0,
                 interactive: false,
-              } as object}
+              }}
             />
-
-            {/* Solid impact zone */}
-            <Circle
-              center={[event.latitude, event.longitude]}
-              radius={impactRadius}
+            {/* Main impact zone — organic blob */}
+            <Polygon
+              positions={innerBlob}
               pathOptions={{
                 color: color.stroke,
                 fillColor: color.fill,
                 fillOpacity,
-                weight: isHighlighted ? 3 : 2.5,
-                interactive: false,
-              } as object}
-            />
-
-            {/* Precise location marker */}
-            <CircleMarker
-              center={[event.latitude, event.longitude]}
-              radius={isHighlighted ? radius + 4 : radius}
-              pathOptions={{
-                color: isHighlighted ? "#ffffff" : color.stroke,
-                fillColor: color.fill,
-                fillOpacity: 0.95,
                 weight: isHighlighted ? 3 : 2,
+                interactive: false,
               }}
+            />
+            {/* Emoji icon marker */}
+            <Marker
+              position={[event.latitude, event.longitude]}
+              icon={icon}
+              zIndexOffset={isHighlighted ? 1000 : todayEvent ? 500 : 0}
             >
-              <Tooltip direction="top" offset={[0, -(isHighlighted ? radius + 4 : radius)]} sticky>
+              <Tooltip direction="top" offset={[0, -(iconSize / 2 + 4)]} sticky>
                 <div className="text-xs">
                   <span className="font-bold">{color.label}</span>
                   {" · "}
@@ -135,7 +166,7 @@ export function StormEventLayer() {
                 </div>
               </Tooltip>
               <StormPopup event={event} nearbyCount={nearbyCount} />
-            </CircleMarker>
+            </Marker>
           </React.Fragment>
         )
       })}

@@ -1,6 +1,8 @@
 "use client"
 
-import { Circle, CircleMarker, Tooltip, Popup } from "react-leaflet"
+import React from "react"
+import { Polygon, Marker, Tooltip, Popup } from "react-leaflet"
+import L from "leaflet"
 import { useReports } from "@/hooks/useReports"
 import { getStormColor } from "@/lib/stormColors"
 import { searchFLLocations } from "@/lib/florida-locations"
@@ -27,7 +29,6 @@ function impactRadiusM(stormType: string): number {
 }
 
 function getCenter(geoJson: unknown, areaName: string): [number, number] {
-  // 1. GeoJSON coordinates
   try {
     const geo = geoJson as { type: string; coordinates: unknown }
     if (geo?.type === "Point") {
@@ -42,18 +43,15 @@ function getCenter(geoJson: unknown, areaName: string): [number, number] {
     }
   } catch { /* fall through */ }
 
-  // 2. Text-based resolution — try the location part after the dash first
   const candidates: string[] = []
   const dashPart = areaName.split(/[—–]/).slice(1).join(" ").trim()
   if (dashPart) {
     dashPart.split(",").forEach((s) =>
       candidates.push(s.trim().replace(/\s+(co\.|county|fl|florida)\.?$/i, "").trim())
     )
-    // Word-by-word (handles "3 NNW Punta Gorda" → tries "Punta", "Gorda", etc.)
     const words = dashPart.split(/[\s,]+/).filter((w) => w.length > 3 && !/^\d+$/.test(w) && !/^[A-Z]{1,3}$/.test(w))
     words.reverse().forEach((w) => candidates.push(w))
   }
-  // Also try the full name before the dash
   candidates.push(areaName.split(/[—–]/)[0].trim())
 
   for (const term of candidates) {
@@ -62,8 +60,43 @@ function getCenter(geoJson: unknown, areaName: string): [number, number] {
     if (hits.length > 0) return [hits[0].latitude, hits[0].longitude]
   }
 
-  // 3. Always render — fall back to Florida center so no report is ever hidden
   return [27.9944, -81.7603]
+}
+
+function blobPolygon(lat: number, lng: number, radiusM: number): [number, number][] {
+  const N = 22
+  const latR = radiusM / 111000
+  const lngR = radiusM / (111000 * Math.cos((lat * Math.PI) / 180))
+  const seed = ((lat * 997 + lng * 431) % (2 * Math.PI)) + 1
+
+  return Array.from({ length: N }, (_, i) => {
+    const angle = (i / N) * 2 * Math.PI
+    const r =
+      1 +
+      0.13 * Math.sin(angle * 3 + seed) +
+      0.09 * Math.cos(angle * 5 + seed * 1.6) +
+      0.05 * Math.sin(angle * 7 + seed * 0.8)
+    return [lat + latR * r * Math.cos(angle), lng + lngR * r * Math.sin(angle)] as [number, number]
+  })
+}
+
+function makeIcon(emoji: string, color: string) {
+  return L.divIcon({
+    html: `<div style="
+      width:30px;height:30px;
+      background:${color};
+      border:2.5px solid #fff;
+      border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:15px;line-height:1;
+      box-shadow:0 2px 6px rgba(0,0,0,0.45);
+      ">📋</div>`,
+    className: "",
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    tooltipAnchor: [0, -19],
+    popupAnchor: [0, -19],
+  })
 }
 
 function formatDate(iso: string) {
@@ -73,57 +106,44 @@ function formatDate(iso: string) {
 export function ReportLayer() {
   const { data: reports = [] } = useReports()
 
-  const positioned = reports.map((r) => ({
-    report: r,
-    center: getCenter(r.geoJson, r.areaName),
-  }))
-
   return (
     <>
-      {positioned.map(({ report, center }) => {
+      {reports.map((report: Report) => {
+        const center = getCenter(report.geoJson, report.areaName)
         const stormType = parseStormType(report.areaName)
         const radiusM = impactRadiusM(stormType)
         const color = getStormColor(stormType)
+        const outerBlob = blobPolygon(center[0], center[1], radiusM * 1.3)
+        const innerBlob = blobPolygon(center[0], center[1], radiusM)
+        const icon = makeIcon(color.emoji, color.fill)
 
         return (
           <React.Fragment key={report.id}>
-            {/* Glow ring */}
-            <Circle
-              center={center}
-              radius={radiusM * 1.3}
+            {/* Outer glow */}
+            <Polygon
+              positions={outerBlob}
               pathOptions={{
                 color: color.stroke,
                 fillColor: color.fill,
-                fillOpacity: 0.06,
-                weight: 1,
-                dashArray: "8 5",
+                fillOpacity: 0.07,
+                weight: 0,
                 interactive: false,
-              } as object}
+              }}
             />
-            {/* Impact zone */}
-            <Circle
-              center={center}
-              radius={radiusM}
+            {/* Impact zone blob */}
+            <Polygon
+              positions={innerBlob}
               pathOptions={{
                 color: color.stroke,
                 fillColor: color.fill,
-                fillOpacity: 0.22,
+                fillOpacity: 0.32,
                 weight: 2,
                 interactive: false,
-              } as object}
-            />
-            {/* Pin */}
-            <CircleMarker
-              center={center}
-              radius={9}
-              pathOptions={{
-                color: "#ffffff",
-                fillColor: color.fill,
-                fillOpacity: 1,
-                weight: 2.5,
               }}
-            >
-              <Tooltip direction="top" offset={[0, -12]}>
+            />
+            {/* Report pin */}
+            <Marker position={center} icon={icon}>
+              <Tooltip direction="top" offset={[0, -19]}>
                 <div className="text-xs">
                   <div className="font-bold">{report.areaName}</div>
                   <div className="opacity-70">{formatDate(report.generatedAt)}</div>
@@ -132,11 +152,15 @@ export function ReportLayer() {
               <Popup>
                 <div className="text-sm min-w-[180px]">
                   <div className="font-bold mb-1" style={{ color: color.stroke }}>{report.areaName}</div>
-                  {report.summary && <div className="text-xs text-slate-600 mb-2">{report.summary.slice(0, 120)}{report.summary.length > 120 ? "…" : ""}</div>}
-                  <div className="text-xs text-slate-400">{formatDate(report.generatedAt)}</div>
+                  {report.summary && (
+                    <div className="text-xs text-slate-600 mb-2">
+                      {report.summary.slice(0, 120)}{report.summary.length > 120 ? "…" : ""}
+                    </div>
+                  )}
+                  <div className="text-xs text-slate-400 mb-2">{formatDate(report.generatedAt)}</div>
                   <a
                     href={`/api/reports/${report.id}/pdf`}
-                    className="mt-2 block text-center text-xs font-semibold text-white rounded px-2 py-1"
+                    className="block text-center text-xs font-semibold text-white rounded px-2 py-1"
                     style={{ backgroundColor: color.stroke }}
                     target="_blank"
                     rel="noreferrer"
@@ -145,13 +169,10 @@ export function ReportLayer() {
                   </a>
                 </div>
               </Popup>
-            </CircleMarker>
+            </Marker>
           </React.Fragment>
         )
       })}
     </>
   )
 }
-
-// React is needed for React.Fragment
-import React from "react"

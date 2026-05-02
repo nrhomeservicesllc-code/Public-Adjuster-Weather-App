@@ -174,4 +174,5 @@ export interface StormColor {
   label: string
   bgClass: string
   textClass: string
+  emoji: string
 }
